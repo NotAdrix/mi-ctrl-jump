@@ -21,27 +21,26 @@ class $modify(CCKeyboardDispatcher) {
 
 /**
  * REASIGNACIÓN DE MOUSE
- * Corregido: La función es 'dispatchMouseButton'. 
- * Usamos MouseButton (sin geode::) ya que el prelude lo incluye.
+ * Corregido para GD 2.2081: La función se llama 'mouseButton'.
+ * Usamos 'int' para el botón para evitar errores de tipos desconocidos.
  */
 class $modify(CCMouseDispatcher) {
-    void dispatchMouseButton(MouseButton button, bool down, float x, float y) {
+    void mouseButton(int button, bool down, bool doubleClick) {
         auto kbd = CCKeyboardDispatcher::get();
 
-        // Click Derecho -> Tecla Z
-        if (button == MouseButton::Right) {
-            // Mandamos señal al teclado (Z, estado de pulsación, no repetir, tiempo 0)
+        // En Cocos2d-x (RobTop): 1 es Click Derecho, 2 es Click Ruedita.
+        if (button == 1) { // Click Derecho
+            // Mandamos la señal al teclado (Tecla Z, presionado, no repetir, tiempo 0.0)
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return; // Consumimos el evento para que no haga nada más en el juego
+            return; // Bloqueamos el click original
         }
 
-        // Click Ruedita -> Tecla X
-        if (button == MouseButton::Middle) {
+        if (button == 2) { // Click Ruedita
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
             return;
         }
 
-        // El resto (click izquierdo, etc) sigue su flujo normal
-        CCMouseDispatcher::dispatchMouseButton(button, down, x, y);
+        // El resto (click izquierdo, etc) sigue normal
+        CCMouseDispatcher::mouseButton(button, down, doubleClick);
     }
 };
