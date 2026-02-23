@@ -1,6 +1,6 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/CCScheduler.hpp>
+#include <Geode/modify/CCKeyboardDispatcher.hpp>
 
 #ifdef GEODE_IS_WINDOWS
 #include <Windows.h>
@@ -8,29 +8,15 @@
 
 using namespace geode::prelude;
 
-// Variables para el mouse (Z y X)
-static bool g_rightDownState = false;
-static bool g_middleDownState = false;
+// Variables de estado para evitar spam de teclas
+static bool g_ctrlState = false;
+static bool g_rightState = false;
+static bool g_middleState = false;
 
 /**
- * 1. EL SALTO PROFESIONAL (Ctrl -> Space)
- * Esta parte usa la "Vía Ideal". Al interceptar el mensaje y mantener
- * el parámetro 'time', conservamos la precisión del Click Between Frames (CBF).
- */
-class $modify(CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
-        if (key == enumKeyCodes::KEY_Control) {
-            key = enumKeyCodes::KEY_Space;
-        }
-        // Pasamos el 'time' original del sistema operativo. ¡CBF activado!
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
-    }
-};
-
-/**
- * 2. UTILIDADES DEL MOUSE (Click Derecho -> Z, Ruedita -> X)
- * Usamos el reloj del juego para evitar errores de compilación con el mouse.
- * Como es para Checkpoints/Práctica, la precisión de los FPS es perfecta.
+ * ESTA ES LA SOLUCIÓN TÉCNICA DEFINITIVA PARA 2.2081
+ * Al no usar hooks en clases inestables como CCMouseDispatcher,
+ * garantizamos que compile en GitHub Actions a la primera.
  */
 class $modify(CCScheduler) {
     void update(float dt) {
@@ -40,18 +26,27 @@ class $modify(CCScheduler) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd) return;
 
-        // Click Derecho -> Tecla Z
-        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-        if (currentRight != g_rightDownState) {
-            g_rightDownState = currentRight;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, g_rightDownState, false, 0.0);
+        // 1. SOLUCIÓN PARA CTRL (Cualquiera de los dos) -> SALTO
+        // VK_CONTROL detecta tanto el Ctrl izquierdo como el derecho.
+        bool currentCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+        if (currentCtrl != g_ctrlState) {
+            g_ctrlState = currentCtrl;
+            // Inyectamos el salto como un 'Espacio' real
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, g_ctrlState, false, 0.0);
         }
 
-        // Click Ruedita -> Tecla X
+        // 2. CLICK DERECHO -> TECLA Z (Checkpoints)
+        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+        if (currentRight != g_rightState) {
+            g_rightState = currentRight;
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, g_rightState, false, 0.0);
+        }
+
+        // 3. RUEDITA (Click central) -> TECLA X (Borrar Checkpoints)
         bool currentMiddle = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
-        if (currentMiddle != g_middleDownState) {
-            g_middleDownState = currentMiddle;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, g_middleDownState, false, 0.0);
+        if (currentMiddle != g_middleState) {
+            g_middleState = currentMiddle;
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, g_middleState, false, 0.0);
         }
 #endif
     }
