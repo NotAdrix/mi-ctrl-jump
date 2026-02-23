@@ -1,48 +1,52 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
+#include <Geode/modify/CCMouseDispatcher.hpp>
 
 using namespace geode::prelude;
 
 /**
- * 1. TECLADO (Ctrl -> Space)
- * Hookeamos el despachador para interceptar el mensaje "al vuelo".
- * El parámetro 'time' es el que lleva la precisión del CBF.
+ * 1. REASIGNACIÓN DE TECLADO (Ctrl -> Space)
+ * Compatible con CBF: Al reasignar la identidad de la tecla y mantener 'time',
+ * el motor de físicas recibe el salto con la precisión original del hardware.
  */
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
-        // Capturamos Control y lo disfrazamos de Space.
-        // Se mantiene el 'time' (sub-frame timing) para compatibilidad con CBF.
+        // En Geode v5 para 2.2081, KEY_Control es el identificador estándar.
         if (key == enumKeyCodes::KEY_Control) {
             key = enumKeyCodes::KEY_Space;
         }
+        // Retornamos la función original con la tecla cambiada pero el TIEMPO intacto.
         return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
     }
 };
 
 /**
- * 2. MOUSE (Click Derecho -> Z, Ruedita -> X)
- * Usamos el sistema de Eventos de Geode con el filtro 'MouseButtonFilter'.
- * Esto es inmune a los cambios de RobTop en Cocos2d-x.
+ * 2. REASIGNACIÓN DE MOUSE (Click Derecho -> Z, Ruedita -> X)
+ * En la versión 2.2081, la función se llama 'dispatchMouseButton'.
+ * Usamos el namespace explícito geode::MouseButton para evitar errores.
  */
-$execute {
-    // Registramos un "escuchador" para eventos de botones del mouse
-    new EventListener<MouseButtonFilter>(+[](MouseButtonEvent* event) {
+class $modify(CCMouseDispatcher) {
+    void dispatchMouseButton(geode::MouseButton button, bool down) {
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return ListenerResult::Propagate;
+        if (!kbd) {
+            CCMouseDispatcher::dispatchMouseButton(button, down);
+            return;
+        }
 
         // Click Derecho -> Tecla Z
-        if (event->m_button == MouseButton::Right) {
-            // Mandamos Z con el estado de pulsación (m_down) del mouse
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, event->m_down, false, 0.0);
-            return ListenerResult::Stop; // Evitamos que el juego use el click derecho
+        if (button == geode::MouseButton::Right) {
+            // Mandamos Z con tiempo 0.0 (el juego le asignará el tiempo actual de proceso)
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
+            return; // Bloqueamos el click original
         }
 
-        // Click Ruedita (Middle) -> Tecla X
-        if (event->m_button == MouseButton::Middle) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, event->m_down, false, 0.0);
-            return ListenerResult::Stop;
+        // Click Ruedita -> Tecla X
+        if (button == geode::MouseButton::Middle) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
+            return;
         }
 
-        return ListenerResult::Propagate;
-    });
-}
+        // El resto (click izquierdo, etc.) sigue normal
+        CCMouseDispatcher::dispatchMouseButton(button, down);
+    }
+};
