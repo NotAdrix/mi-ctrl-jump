@@ -8,29 +8,24 @@
     "version": "1.1.0",
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
-    "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita (clic) -> X.",
+    "description": "Remapeo por ID con doble bindeo opcional y soporte para mouse.",
     "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "early-load": true,
-    "tags": [
-        "gameplay",
-        "utility"
-    ],
+    "tags": ["gameplay", "utility"],
     "settings": {
         "jump-keybind": {
             "name": "Tecla de Salto 1",
-            "description": "Primera tecla para saltar (ej. L-Ctrl).",
             "type": "keybind",
             "default": "l-ctrl"
         },
         "jump-keybind-2": {
             "name": "Tecla de Salto 2",
-            "description": "Segunda tecla opcional (ej. Shift).",
+            "description": "Opcional (Shift, Alt, etc.)",
             "type": "keybind",
             "default": "none"
         },
         "rapid-checkpoints": {
             "name": "Rapid Checkpoints (Mouse)",
-            "description": "Habilita Click Derecho -> Z y Click Rueda -> X.",
             "type": "bool",
             "default": true
         }
