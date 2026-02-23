@@ -1,30 +1,34 @@
-#include <Geode/binding/PlayLayer.hpp>
+#include <Geode/Geode.hpp>
 #include <Geode/modify/UILayer.hpp>
-#include <Geode/binding/CCKeyboardDispatcher.hpp>
-#include <Geode/utils/cocos.hpp>
+// Estos son los bindeos correctos para Cocos2d en Geode v5
+#include <Geode/cocos/include/cocos2d.h>
 
 using namespace geode::prelude;
 
 struct $modify(MyUILayer, UILayer) {
     static void onModify(auto& self) {
-        // Prioridad Late para interceptar después de otros mods, pero antes que el juego
+        // Prioridad Late para interceptar antes que el juego procese el input
         (void)self.setHookPriority("UILayer::handleKeypress", Priority::Late);
     }
 
-    // El "Amazing Hack": Simula una tecla mientras manipula los modificadores
+    // Bandera de control para evitar bucles infinitos
+    static inline bool allowKeyDownThrough = false;
+
+    // EL HACK PRO: Simula una tecla mientras manipula los modificadores (Ctrl/Shift)
     void pressKeyFallthrough(enumKeyCodes key, bool down, double timestamp) {
         if (!this->isCurrentPlayLayer()) return;
 
-        auto GM = GameManager::sharedState();
-        auto dispatcher = CCDirector::get()->getKeyboardDispatcher();
+        auto dispatcher = CCDirector::sharedDirector()->getKeyboardDispatcher();
 
-        // Guardamos estado original
+        // Guardamos el estado real de las teclas modificadoras
         auto oShift = dispatcher->getShiftKeyPressed();
         auto oCtrl = dispatcher->getControlKeyPressed();
+        auto oAlt = dispatcher->getAltKeyPressed();
+        auto oCmd = dispatcher->getCommandKeyPressed();
 
-        // Desactivamos temporalmente el flag de Control para que el juego 
-        // no piense que es un comando de sistema (como Ctrl+S)
-        dispatcher->updateModifierKeys(oShift, false, false, false);
+        // DESACTIVAMOS el Control para el motor (enmascaramiento)
+        // Esto evita que el juego crea que es un comando de sistema (como Ctrl+R)
+        dispatcher->updateModifierKeys(oShift, false, oAlt, oCmd);
 
         allowKeyDownThrough = true;
         if (down) {
@@ -34,8 +38,8 @@ struct $modify(MyUILayer, UILayer) {
         }
         allowKeyDownThrough = false;
 
-        // Restauramos estado
-        dispatcher->updateModifierKeys(oShift, oCtrl, false, false);
+        // Restauramos el estado original para no romper el sistema
+        dispatcher->updateModifierKeys(oShift, oCtrl, oAlt, oCmd);
     }
 
     bool isCurrentPlayLayer() {
@@ -46,23 +50,24 @@ struct $modify(MyUILayer, UILayer) {
     bool init(GJBaseGameLayer* layer) {
         if (!UILayer::init(layer)) return false;
 
+        // Esperamos un frame para que PlayLayer esté listo
         geode::Loader::get()->queueInMainThread([this] {
             if (!PlayLayer::get()) return;
 
-            // --- ACCIÓN: JUMP (Ctrl -> Space) ---
+            // --- Lógica de Teclado (Ctrl -> Space) ---
             this->defineKeybind("jump-p1", [this](bool down, bool repeat, double timestamp) {
                 if (repeat) return ListenerResult::Propagate;
                 
-                // El método profesional: queueButton para latencia de hardware
+                // Usamos queueButton para la latencia cero (físicas directas)
                 PlayLayer::get()->queueButton(1, down, false, timestamp);
                 
-                // Enmascaramos como un Space físico por si otros mods escuchan keyDown
+                // Realizamos el enmascaramiento: el juego "ve" un Space sin Ctrl
                 this->pressKeyFallthrough(KEY_Space, down, timestamp);
                 
-                return ListenerResult::Stop; // Aquí ocurre el enmascaramiento total
+                return ListenerResult::Stop; 
             });
 
-            // --- ACCIÓN: CHECKPOINT (Mouse Right -> Z) ---
+            // --- Lógica de Mouse (Right Click -> Z) ---
             this->defineKeybind("place-checkpoint", [this](bool down, bool repeat, double timestamp) {
                 if (repeat) return ListenerResult::Propagate;
                 this->pressKeyFallthrough(KEY_Z, down, timestamp);
@@ -73,7 +78,7 @@ struct $modify(MyUILayer, UILayer) {
         return true;
     }
 
-    // Helper para registrar el evento de Geode v5
+    // Helper para registrar el evento de Geode v5 sin colisionar
     void defineKeybind(std::string id, std::function<ListenerResult(bool, bool, double)> callback) {
         PlayLayer::get()->addEventListener(
             KeybindSettingPressedEventV3(Mod::get(), std::move(id)),
@@ -83,9 +88,9 @@ struct $modify(MyUILayer, UILayer) {
         );
     }
 
-    static inline bool allowKeyDownThrough = false;
+    // Capturamos la pulsación para dejarla pasar solo si nuestro mod lo permite
     void handleKeypress(cocos2d::enumKeyCodes key, bool down, double timestamp) {
-        if (allowKeyDownThrough) {
+        if (key == enumKeyCodes::KEY_Escape || allowKeyDownThrough) {
             UILayer::handleKeypress(key, down, timestamp);
             allowKeyDownThrough = false;
         }
