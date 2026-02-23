@@ -1,37 +1,17 @@
 {
-	"geode": "4.0.0",
-	"gd": {
-		"win": "2.2074"
-	},
-	"id": "notadrix.mi_ctrl_jump",
-	"name": "Super Ctrl Jump",
-	"developer": "NotAdrix",
-	"version": "v1.1.0",
-	"description": "Permite saltar con Control y configurar teclas para Checkpoints.",
-	"settings": {
-		"jump-key-1": {
-			"name": "Salto Primario",
-			"type": "keybind",
-			"default": "lcontrol",
-			"description": "Tecla principal para saltar (Ej: Control Izquierdo)."
-		},
-		"jump-key-2": {
-			"name": "Salto Secundario",
-			"type": "keybind",
-			"default": "none",
-			"description": "Segunda tecla opcional para saltar."
-		},
-		"checkpoint-key": {
-			"name": "Poner Checkpoint",
-			"type": "keybind",
-			"default": "Z",
-			"description": "Tecla para poner un checkpoint."
-		},
-		"remove-checkpoint-key": {
-			"name": "Borrar Checkpoint",
-			"type": "keybind",
-			"default": "X",
-			"description": "Tecla para borrar el último checkpoint."
-		}
-	}
+    "geode": "v5.0.0",
+    "gd": {
+        "win": "2.2074",
+        "android": "2.2074"
+    },
+    "id": "notadrix.mi_ctrl_jump",
+    "version": "v1.0.0",
+    "name": "Mi Ctrl Jump",
+    "developer": "notadrix",
+    "description": "Remapeo global: Ctrl -> Space, Click Derecho -> Z, Ruedita -> X.",
+    "tags": [
+        "gameplay",
+        "utility"
+    ],
+    "settings": {}
 }
