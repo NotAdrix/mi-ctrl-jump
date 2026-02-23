@@ -19,11 +19,11 @@ class $modify(CCKeyboardDispatcher) {
 
 // ── MOUSE ─────────────────────────────────────────────────────────────────────
 $execute {
-    new EventListener<EventFilter<geode::MouseInputEvent>>(+[](geode::MouseInputEvent* ev) {
+    // Click derecho -> Z, click central -> X
+    geode::MouseInputEvent().listen(+[](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        auto& data = ev->getData(); // o como exponga el evento su data
         bool down = (data.action == geode::MouseInputData::Action::Press);
 
         if (data.button == geode::MouseInputData::Button::Right) {
@@ -36,14 +36,15 @@ $execute {
         }
 
         return ListenerResult::Propagate;
-    });
+    }).leak();
 
-    new EventListener<EventFilter<geode::ScrollWheelEvent>>(+[](geode::ScrollWheelEvent* ev) {
+    // Scroll -> X
+    geode::ScrollWheelEvent().listen(+[](double x, double y) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd) return ListenerResult::Propagate;
 
         kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true,  false, 0.0);
         kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
         return ListenerResult::Stop;
-    });
+    }).leak();
 }
