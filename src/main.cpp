@@ -5,50 +5,47 @@
 using namespace geode::prelude;
 
 /**
- * REASIGNACIÓN GLOBAL DE TECLADO
- * Interceptamos el mensaje antes de que llegue a la lógica del juego.
+ * REASIGNACIÓN DE TECLADO
+ * Actualizado para GD 2.2081 (4 argumentos)
  */
 class $modify(CCKeyboardDispatcher) {
-    void dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat) {
-        // Si el sistema detecta Control, lo forzamos a ser Space.
-        // KEY_Control es el identificador genérico en Geode.
+    // Se añade el cuarto parámetro 'double time'
+    void dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat, double time) {
         if (key == enumKeyCodes::KEY_Control) {
             key = enumKeyCodes::KEY_Space;
         }
-        
-        // Pasamos la tecla (ahora Space) a la función original.
-        CCKeyboardDispatcher::dispatchKeyboardMSG(key, isKeyDown, isKeyRepeat);
+        // Pasamos los 4 argumentos a la función original
+        CCKeyboardDispatcher::dispatchKeyboardMSG(key, isKeyDown, isKeyRepeat, time);
     }
 };
 
 /**
  * REASIGNACIÓN DE MOUSE
- * Click Derecho -> Z
- * Click Ruedita -> X
+ * Actualizado con namespaces de Geode
  */
 class $modify(CCMouseDispatcher) {
-    bool dispatchMouseEvent(MouseEvent event, MouseButton button, float x, float y) {
+    // Usamos geode::MouseEvent y geode::MouseButton explícitamente
+    bool dispatchMouseEvent(geode::MouseEvent event, geode::MouseButton button, float x, float y) {
         auto kbd = CCKeyboardDispatcher::get();
 
-        // 1. Click Derecho actúa como Z
-        if (button == MouseButton::Right) {
-            if (event == MouseEvent::Down || event == MouseEvent::Up) {
-                bool isDown = (event == MouseEvent::Down);
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, isDown, false);
+        if (button == geode::MouseButton::Right) {
+            if (event == geode::MouseEvent::Down || event == geode::MouseEvent::Up) {
+                bool isDown = (event == geode::MouseEvent::Down);
+                // Enviamos 0 como timestamp para la tecla Z
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, isDown, false, 0);
             }
-            return true; // Bloqueamos el comportamiento original del click derecho
+            return true;
         }
 
-        // 2. Click Ruedita actúa como X
-        if (button == MouseButton::Middle) {
-            if (event == MouseEvent::Down || event == MouseEvent::Up) {
-                bool isDown = (event == MouseEvent::Down);
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, isDown, false);
+        if (button == geode::MouseButton::Middle) {
+            if (event == geode::MouseEvent::Down || event == geode::MouseEvent::Up) {
+                bool isDown = (event == geode::MouseEvent::Down);
+                // Enviamos 0 como timestamp para la tecla X
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, isDown, false, 0);
             }
-            return true; // Bloqueamos el comportamiento original del click central
+            return true;
         }
 
-        // Cualquier otro evento (click izquierdo, movimiento) sigue normal.
         return CCMouseDispatcher::dispatchMouseEvent(event, button, x, y);
     }
 };
