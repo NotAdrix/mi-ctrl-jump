@@ -12,8 +12,8 @@
 		"jump-key-1": {
 			"name": "Salto Primario",
 			"type": "keybind",
-			"default": "ctrl",
-			"description": "Tecla principal para saltar."
+			"default": "lcontrol",
+			"description": "Tecla principal para saltar (Ej: Control Izquierdo)."
 		},
 		"jump-key-2": {
 			"name": "Salto Secundario",
@@ -24,14 +24,14 @@
 		"checkpoint-key": {
 			"name": "Poner Checkpoint",
 			"type": "keybind",
-			"default": "right-click",
-			"description": "Tecla o botón de mouse para poner un checkpoint."
+			"default": "Z",
+			"description": "Tecla para poner un checkpoint."
 		},
 		"remove-checkpoint-key": {
 			"name": "Borrar Checkpoint",
 			"type": "keybind",
-			"default": "mdev_middle",
-			"description": "Tecla o botón de mouse para borrar el último checkpoint."
+			"default": "X",
+			"description": "Tecla para borrar el último checkpoint."
 		}
 	}
 }
