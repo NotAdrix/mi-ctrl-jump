@@ -1,18 +1,27 @@
 {
     "geode": "5.0.0",
+    "gd": {
+        "win": "2.2081",
+        "android": "2.2074"
+    },
     "id": "notadrix.mi_ctrl_jump",
     "version": "1.2.0",
     "name": "Mi Ctrl Jump Pro",
     "developer": "notadrix",
+    "description": "Remapeo profesional de Ctrl a Space con enmascaramiento de modificadores.",
+    "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "early-load": true,
+    "tags": ["gameplay", "utility"],
     "settings": {
         "jump-p1": {
-            "name": "Remapear a Salto",
+            "name": "Acción de Salto",
+            "description": "Tecla para saltar (Ej: L-Ctrl).",
             "type": "keybind",
             "default": "l-ctrl"
         },
         "place-checkpoint": {
             "name": "Poner Checkpoint",
+            "description": "Acción para modo práctica.",
             "type": "keybind",
             "default": "rclick"
         }
