@@ -3,30 +3,25 @@
 
 using namespace geode::prelude;
 
-class $modify(MyUILayer, UILayer) {
-    void keyDown(cocos2d::enumKeyCodes key) {
-        // Si presionas Ctrl, salta
-        if (key == cocos2d::enumKeyCodes::KEY_Control || 
-            key == cocos2d::enumKeyCodes::KEY_LControl || 
-            key == cocos2d::enumKeyCodes::KEY_RControl) {
-            
-            if (auto playLayer = PlayLayer::get()) {
+class $modify(UILayer) {
+    void keyDown(enumKeyCodes key) {
+        if (key == enumKeyCodes::KEY_Control) {
+            auto playLayer = PlayLayer::get();
+            if (playLayer) {
                 playLayer->pushButton(PlayerButton::Jump, true);
             }
         }
         UILayer::keyDown(key);
     }
 
-    void keyUp(cocos2d::enumKeyCodes key) {
-        // Si sueltas Ctrl, deja de saltar
-        if (key == cocos2d::enumKeyCodes::KEY_Control || 
-            key == cocos2d::enumKeyCodes::KEY_LControl || 
-            key == cocos2d::enumKeyCodes::KEY_RControl) {
-            
-            if (auto playLayer = PlayLayer::get()) {
-                playLayer->releaseButton(PlayerButton::Jump, true);
+    void keyUp(enumKeyCodes key) {
+        if (key == enumKeyCodes::KEY_Control) {
+            auto playLayer = PlayLayer::get();
+            if (playLayer) {
+                playLayer->pushButton(PlayerButton::Jump, false);
             }
         }
-        UILayer::keyUp(key);
+        // Agregamos el 0 que faltaba para el timestamp
+        UILayer::keyUp(key, 0);
     }
 };
