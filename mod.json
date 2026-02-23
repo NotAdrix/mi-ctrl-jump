@@ -1,22 +1,20 @@
 {
     "geode": "5.0.0",
-    "gd": {
-        "win": "2.2081",
-        "android": "2.2074"
-    },
     "id": "notadrix.mi_ctrl_jump",
-    "version": "1.1.0",
-    "name": "Mi Ctrl Jump",
+    "version": "1.2.0",
+    "name": "Mi Ctrl Jump Pro",
     "developer": "notadrix",
-    "description": "Remapea Ctrl a Space y botones del mouse a Z/X.",
-    "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "early-load": true,
-    "tags": ["gameplay", "utility"],
     "settings": {
-        "rapid-checkpoints": {
-            "name": "Rapid Checkpoints (Mouse)",
-            "type": "bool",
-            "default": true
+        "jump-p1": {
+            "name": "Remapear a Salto",
+            "type": "keybind",
+            "default": "l-ctrl"
+        },
+        "place-checkpoint": {
+            "name": "Poner Checkpoint",
+            "type": "keybind",
+            "default": "rclick"
         }
     }
 }
