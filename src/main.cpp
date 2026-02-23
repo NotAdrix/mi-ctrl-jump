@@ -3,34 +3,38 @@
 using namespace geode::prelude;
 
 $execute {
-    // ── TECLADO: Remapeo con Cast Numérico para Latencia Cero ────────────────
+    // ── TECLADO: Extracción por ID plano (Bypassing Geode::Key) ─────────────
     geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         auto mod = Mod::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        // Obtenemos el bindeo como int64_t y lo casteamos a enumKeyCodes
-        // (getSettingValue no soporta enumKeyCodes directamente en Geode v5)
-        auto key1 = static_cast<enumKeyCodes>(mod->getSettingValue<int64_t>("jump-keybind"));
-        auto key2 = static_cast<enumKeyCodes>(mod->getSettingValue<int64_t>("jump-keybind-2"));
+        // Obtenemos el objeto de ajuste directamente
+        auto sett1 = mod->getSetting("jump-keybind");
+        auto sett2 = mod->getSetting("jump-keybind-2");
 
-        // Convertimos ambos a int. Esto elimina errores de tipos y asegura
-        // que la comparación sea la operación más rápida posible del CPU.
-        int pressedKey = static_cast<int>(data.key);
-        int target1 = static_cast<int>(key1);
-        int target2 = static_cast<int>(key2);
+        if (sett1 && sett2) {
+            // Geode guarda los bindeos internamente como {"key": ID, "modifiers": X}
+            // Extraemos el ID numérico directamente del JSON para que compile SIEMPRE
+            int64_t id1 = sett1->getValue()["key"].asInt().unwrapOr(0);
+            int64_t id2 = sett2->getValue()["key"].asInt().unwrapOr(0);
 
-        if (pressedKey == target1 || pressedKey == target2) {
-            bool down = (data.action != geode::KeyboardInputData::Action::Release);
-            
-            kbd->dispatchKeyboardMSG(
-                enumKeyCodes::KEY_Space, 
-                down, 
-                (data.action == geode::KeyboardInputData::Action::Repeat), 
-                data.timestamp
-            );
+            // Convertimos la tecla que acabas de presionar a un número plano
+            int64_t pressed = static_cast<int64_t>(data.key);
 
-            return ListenerResult::Stop;
+            if (pressed == id1 || (id2 != 0 && pressed == id2)) {
+                bool down = (data.action != geode::KeyboardInputData::Action::Release);
+                
+                // Transformamos el input en un salto de Barra Espaciadora
+                kbd->dispatchKeyboardMSG(
+                    enumKeyCodes::KEY_Space, 
+                    down, 
+                    (data.action == geode::KeyboardInputData::Action::Repeat), 
+                    data.timestamp
+                );
+
+                return ListenerResult::Stop;
+            }
         }
 
         return ListenerResult::Propagate;
