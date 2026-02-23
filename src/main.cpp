@@ -1,20 +1,23 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCMouseDispatcher.hpp>
+#include <Geode/loader/Event.hpp>
 
 using namespace geode::prelude;
 
 /**
  * 1. TECLADO (Ctrl -> Space)
- * Esta es la parte vital para el CBF. 
- * Al usar el 'double time', pasamos la precisión de microsegundos del hardware.
+ * COMPATIBILIDAD CBF: Al interceptar el mensaje y reenviar el parámetro 'time',
+ * el motor de físicas recibe el salto con la precisión original del hardware.
  */
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
         if (key == enumKeyCodes::KEY_Control) {
-            // Transformamos a Space pero pasamos el 'time' ORIGINAL del sistema.
-            // Esto es lo que permite al CBF funcionar con el Ctrl.
-            return CCKeyboardDispatcher::dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, repeat, time);
+            // Enviamos un 'Espacio' con el TIEMPO EXACTO del sistema (CBF)
+            CCKeyboardDispatcher::dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, repeat, time);
+            
+            // IMPORTANTE: Retornar 'true' bloquea el Ctrl original.
+            // Esto evita que el juego detecte que pulsaste Ctrl.
+            return true; 
         }
         return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
     }
@@ -22,29 +25,28 @@ class $modify(CCKeyboardDispatcher) {
 
 /**
  * 2. MOUSE (Click Derecho -> Z, Ruedita -> X)
- * Usamos CCMouseDispatcher con la firma de 2.2081.
- * Para evitar errores de tipo, usamos 'int' para el botón.
+ * Usamos el sistema de Eventos de Geode v5.
+ * Es inmune a los cambios de RobTop en Cocos2d-x y mantiene el CBF.
  */
-class $modify(CCMouseDispatcher) {
-    void dispatchMouseButton(int button, bool down) {
+$execute {
+    // Escuchamos clics de mouse usando el filtro correcto de Geode v5
+    new EventListener<MouseButtonEvent>(+[](MouseButtonEvent* event) {
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) {
-            CCMouseDispatcher::dispatchMouseButton(button, down);
-            return;
+        if (!kbd) return ListenerResult::Propagate;
+
+        // Click Derecho -> Tecla Z
+        if (event->m_button == MouseButton::Right) {
+            // El tiempo 0.0 es suficiente aquí ya que Z/X no son de gameplay crítico
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, event->m_down, false, 0.0);
+            return ListenerResult::Stop; 
         }
 
-        // 1 = Right Click, 2 = Middle Click (Ruedita)
-        if (button == 1) {
-            // Mandamos Z. El 0.0 de tiempo hará que el motor use el tiempo actual.
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return; // Bloqueamos el click original
+        // Click Ruedita -> Tecla X
+        if (event->m_button == MouseButton::Middle) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, event->m_down, false, 0.0);
+            return ListenerResult::Stop;
         }
 
-        if (button == 2) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return;
-        }
-
-        CCMouseDispatcher::dispatchMouseButton(button, down);
-    }
-};
+        return ListenerResult::Propagate;
+    }, MouseButtonFilter()); // Filtro constructor para Geode v5
+}
