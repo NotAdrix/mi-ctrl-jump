@@ -4,24 +4,25 @@
 using namespace geode::prelude;
 
 class $modify(UILayer) {
-    void keyDown(enumKeyCodes key) {
+    void keyDown(enumKeyCodes key, double timestamp) {
         if (key == enumKeyCodes::KEY_Control) {
             auto playLayer = PlayLayer::get();
-            if (playLayer) {
-                playLayer->pushButton(PlayerButton::Jump, true);
+            if (playLayer && playLayer->m_player1) {
+                // En la 2.2081 se usa m_player1 para saltar
+                playLayer->m_player1->pushButton(PlayerButton::Jump);
             }
         }
-        UILayer::keyDown(key);
+        UILayer::keyDown(key, timestamp);
     }
 
-    void keyUp(enumKeyCodes key) {
+    void keyUp(enumKeyCodes key, double timestamp) {
         if (key == enumKeyCodes::KEY_Control) {
             auto playLayer = PlayLayer::get();
-            if (playLayer) {
-                playLayer->pushButton(PlayerButton::Jump, false);
+            if (playLayer && playLayer->m_player1) {
+                // Para soltar el salto
+                playLayer->m_player1->releaseButton(PlayerButton::Jump);
             }
         }
-        // Agregamos el 0 que faltaba para el timestamp
-        UILayer::keyUp(key, 0);
+        UILayer::keyUp(key, timestamp);
     }
 };
