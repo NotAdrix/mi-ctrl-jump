@@ -1,4 +1,29 @@
-geode::KeyboardInputEvent().listen([forceSync](geode::KeyboardInputData& data) {
+#include <Geode/Geode.hpp>
+#include <Geode/utils/Keyboard.hpp>
+#include <Geode/loader/Event.hpp>
+
+using namespace geode::prelude;
+
+$execute {
+
+    static bool isJumping = false;
+
+    auto sendSpace = [](bool down, bool repeat, double timestamp) {
+        auto kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return;
+
+        kbd->dispatchKeyboardMSG(
+            enumKeyCodes::KEY_Space,
+            down,
+            repeat,
+            timestamp
+        );
+    };
+
+    // ───────────────────────────────
+    // KEYBOARD
+    // ───────────────────────────────
+    geode::KeyboardInputEvent().listen([forceSync](geode::KeyboardInputData& data) {
 
     auto kbd = CCKeyboardDispatcher::get();
     auto mod = Mod::get();
@@ -47,3 +72,35 @@ geode::KeyboardInputEvent().listen([forceSync](geode::KeyboardInputData& data) {
     return ListenerResult::Propagate;
 
 }).leak();
+
+
+    // ───────────────────────────────
+    // FAILSAFE — Si por alguna razón GD pierde el release
+    // Se ejecuta en cualquier evento de input
+    // ───────────────────────────────
+    auto safetyCheck = [](KeyboardModifier mods, double timestamp) {
+
+        if (!isJumping)
+            return;
+
+        // Si ningún modificador relevante está físicamente activo
+        bool ctrl  = mods & KeyboardModifier::Control;
+        bool shift = mods & KeyboardModifier::Shift;
+        bool alt   = mods & KeyboardModifier::Alt;
+
+        if (!ctrl && !shift && !alt) {
+            isJumping = false;
+            sendSpace(false, false, timestamp);
+        }
+    };
+
+    geode::MouseInputEvent().listen([safetyCheck](MouseInputData& data) {
+        safetyCheck(data.modifiers, data.timestamp);
+        return ListenerResult::Propagate;
+    }).leak();
+
+    geode::ScrollWheelEvent().listen([safetyCheck](double x, double y) {
+        safetyCheck(KeyboardModifier::None, 0.0);
+        return ListenerResult::Propagate;
+    }).leak();
+}
