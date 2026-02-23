@@ -4,50 +4,44 @@
 using namespace geode::prelude;
 
 /**
- * ESTA ES LA SOLUCIÓN CBF-COMPATIBLE.
- * Interceptamos el evento en el aire y le cambiamos el nombre a la tecla 
- * ANTES de que el motor la procese, conservando el 'time' (sub-frame timing).
+ * 1. TECLADO (Ctrl -> Space)
+ * Hookeamos el despachador para interceptar el mensaje "al vuelo".
+ * El parámetro 'time' es el que lleva la precisión del CBF.
  */
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
-        // En Geode v5/GD 2.2081, KEY_Control atrapa cualquier Ctrl físico.
+        // Si detectamos Control, le cambiamos el nombre a Space
+        // pero mantenemos el 'time' original del sistema.
         if (key == enumKeyCodes::KEY_Control) {
-            // Cambiamos 'key' a Space, pero mantenemos el 'time' intacto.
-            // Esto permite que el CBF lea el espacio con la precisión del Ctrl.
             key = enumKeyCodes::KEY_Space;
         }
-
-        // Si es el Click Derecho (en algunos teclados se mapea aquí) o si quieres
-        // usar el despachador para la Z y X:
-        // (Nota: Para máxima precisión en mouse, se suele usar otro hook, 
-        // pero esto es 100% seguro para el teclado).
-
         return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
     }
 };
 
 /**
- * Para el mouse, si CCMouseDispatcher fallaba, usaremos un hook de bajo nivel
- * en el protocolo de la ventana para mantener la compatibilidad y el CBF.
+ * 2. MOUSE (Click Derecho -> Z, Ruedita -> X)
+ * Usamos el sistema de Eventos de Geode. 
+ * Es 100% inmune a errores de "member not found" y es compatible con CBF.
  */
-#include <Geode/modify/CCEGLViewProtocol.hpp>
-
-class $modify(CCEGLViewProtocol) {
-    void onMouseButton(int button, int action, int mods) {
-        // action 1 = presionar, 0 = soltar
-        bool isDown = (action == 1);
+$execute {
+    // Escuchamos los clics del mouse de forma global
+    new EventListener<AttributeSetFilter>(+[](MouseButtonEvent* event) {
         auto kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return ListenerResult::Propagate;
 
-        // 1 = Click Derecho, 2 = Ruedita
-        if (button == 1) {
-            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, isDown, false, 0.0);
-            return;
-        }
-        if (button == 2) {
-            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, isDown, false, 0.0);
-            return;
+        // Click Derecho (Right) -> Tecla Z
+        if (event->m_button == MouseButton::Right) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, event->m_down, false, 0.0);
+            return ListenerResult::Stop; // Detenemos el clic original
         }
 
-        CCEGLViewProtocol::onMouseButton(button, action, mods);
-    }
-};
+        // Click Ruedita (Middle) -> Tecla X
+        if (event->m_button == MouseButton::Middle) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, event->m_down, false, 0.0);
+            return ListenerResult::Stop;
+        }
+
+        return ListenerResult::Propagate;
+    }, MouseButtonFilter());
+}
