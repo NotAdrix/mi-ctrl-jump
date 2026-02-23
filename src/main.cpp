@@ -5,13 +5,10 @@
 
 using namespace geode::prelude;
 
+// ── TECLADO ───────────────────────────────────────────────────────────────────
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double unk) {
-        auto mod = Mod::get();
-        auto keybind1 = mod->getSettingValue<geode::Keybind>("jump-keybind");
-        auto keybind2 = mod->getSettingValue<geode::Keybind>("jump-keybind-2");
-
-        if (key == keybind1.key || key == keybind2.key) {
+        if (key == enumKeyCodes::KEY_Control) {
             return CCKeyboardDispatcher::dispatchKeyboardMSG(
                 enumKeyCodes::KEY_Space, down, isRepeat, unk
             );
@@ -20,12 +17,11 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
+// ── MOUSE ─────────────────────────────────────────────────────────────────────
 $execute {
     geode::MouseInputEvent().listen([](geode::MouseInputData data) -> ListenerResult {
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd || !Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
-            return ListenerResult::Propagate;
-        }
+        if (!kbd) return ListenerResult::Propagate;
 
         bool down = (data.action == geode::MouseInputData::Action::Press);
 
