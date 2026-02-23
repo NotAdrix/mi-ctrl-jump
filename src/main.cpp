@@ -1,53 +1,50 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-
-#ifdef GEODE_IS_WINDOWS
-#include <Windows.h>
-#endif
+#include <Geode/modify/CCMouseDispatcher.hpp>
 
 using namespace geode::prelude;
 
-// Variables de estado para evitar spam de teclas
-static bool g_ctrlState = false;
-static bool g_rightState = false;
-static bool g_middleState = false;
+/**
+ * 1. TECLADO (Ctrl -> Space)
+ * Esta es la parte vital para el CBF. 
+ * Al usar el 'double time', pasamos la precisión de microsegundos del hardware.
+ */
+class $modify(CCKeyboardDispatcher) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
+        if (key == enumKeyCodes::KEY_Control) {
+            // Transformamos a Space pero pasamos el 'time' ORIGINAL del sistema.
+            // Esto es lo que permite al CBF funcionar con el Ctrl.
+            return CCKeyboardDispatcher::dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, repeat, time);
+        }
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
+    }
+};
 
 /**
- * ESTA ES LA SOLUCIÓN TÉCNICA DEFINITIVA PARA 2.2081
- * Al no usar hooks en clases inestables como CCMouseDispatcher,
- * garantizamos que compile en GitHub Actions a la primera.
+ * 2. MOUSE (Click Derecho -> Z, Ruedita -> X)
+ * Usamos CCMouseDispatcher con la firma de 2.2081.
+ * Para evitar errores de tipo, usamos 'int' para el botón.
  */
-class $modify(CCScheduler) {
-    void update(float dt) {
-        CCScheduler::update(dt);
-
-#ifdef GEODE_IS_WINDOWS
+class $modify(CCMouseDispatcher) {
+    void dispatchMouseButton(int button, bool down) {
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return;
-
-        // 1. SOLUCIÓN PARA CTRL (Cualquiera de los dos) -> SALTO
-        // VK_CONTROL detecta tanto el Ctrl izquierdo como el derecho.
-        bool currentCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-        if (currentCtrl != g_ctrlState) {
-            g_ctrlState = currentCtrl;
-            // Inyectamos el salto como un 'Espacio' real
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, g_ctrlState, false, 0.0);
+        if (!kbd) {
+            CCMouseDispatcher::dispatchMouseButton(button, down);
+            return;
         }
 
-        // 2. CLICK DERECHO -> TECLA Z (Checkpoints)
-        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-        if (currentRight != g_rightState) {
-            g_rightState = currentRight;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, g_rightState, false, 0.0);
+        // 1 = Right Click, 2 = Middle Click (Ruedita)
+        if (button == 1) {
+            // Mandamos Z. El 0.0 de tiempo hará que el motor use el tiempo actual.
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
+            return; // Bloqueamos el click original
         }
 
-        // 3. RUEDITA (Click central) -> TECLA X (Borrar Checkpoints)
-        bool currentMiddle = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
-        if (currentMiddle != g_middleState) {
-            g_middleState = currentMiddle;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, g_middleState, false, 0.0);
+        if (button == 2) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
+            return;
         }
-#endif
+
+        CCMouseDispatcher::dispatchMouseButton(button, down);
     }
 };
