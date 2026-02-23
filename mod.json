@@ -9,6 +9,7 @@
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
     "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita -> X.",
+    "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
     "tags": [
         "gameplay",
         "utility"
