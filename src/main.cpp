@@ -1,49 +1,56 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/PlayLayer.hpp>
+#include <Geode/modify/CCMouseDispatcher.hpp>
 
 using namespace geode::prelude;
 
+/**
+ * PARTE 1: REASIGNACIÓN DE TECLADO
+ * Físico Ctrl -> El juego lee Space
+ */
 class $modify(CCKeyboardDispatcher) {
-    // Usamos la firma exacta de la 2.2081 (con el double p3)
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat, double p3) {
-        auto playLayer = PlayLayer::get();
+    void dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat) {
+        if (key == enumKeyCodes::KEY_Control) {
+            key = enumKeyCodes::KEY_Space;
+        }
+        CCKeyboardDispatcher::dispatchKeyboardMSG(key, isKeyDown, isKeyRepeat);
+    }
+};
 
-        // Si no hay PlayLayer, no estamos en un nivel o el juego está pausado, 
-        // dejamos que el juego maneje el teclado normalmente.
-        if (!playLayer || playLayer->m_isPaused) {
-            return CCKeyboardDispatcher::dispatchKeyboardMSG(key, isKeyDown, isKeyRepeat, p3);
+/**
+ * PARTE 2: REASIGNACIÓN DE MOUSE
+ * Click Derecho -> El juego lee Z
+ * Botón Ruedita -> El juego lee X
+ */
+class $modify(CCMouseDispatcher) {
+    bool dispatchMouseEvent(MouseEvent event, MouseButton button, float x, float y) {
+        auto kbd = CCKeyboardDispatcher::get();
+
+        // Manejar Click Derecho -> Tecla Z
+        if (button == MouseButton::Right) {
+            // Detectamos si se está presionando (Down) o soltando (Up)
+            bool isDown = (event == MouseEvent::Down);
+            
+            // Enviamos la señal de la tecla Z al dispatcher de teclado
+            if (event == MouseEvent::Down || event == MouseEvent::Up) {
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, isDown, false);
+            }
+            // Retornamos true para "consumir" el evento y que el juego 
+            // no intente usar el click derecho para otra cosa (como borrar objetos en el editor)
+            return true; 
         }
 
-        // --- LÓGICA DE SALTO ---
-        auto jump1 = Mod::get()->getSettingValue<enumKeyCodes>("jump-key-1");
-        auto jump2 = Mod::get()->getSettingValue<enumKeyCodes>("jump-key-2");
-
-        if (key == jump1 || (jump2 != enumKeyCodes::KEY_None && key == jump2)) {
-            if (isKeyDown) {
-                playLayer->m_player1->pushButton(PlayerButton::Jump);
-            } else {
-                playLayer->m_player1->releaseButton(PlayerButton::Jump);
+        // Manejar Botón de la Ruedita (Middle) -> Tecla X
+        if (button == MouseButton::Middle) {
+            bool isDown = (event == MouseEvent::Down);
+            
+            if (event == MouseEvent::Down || event == MouseEvent::Up) {
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, isDown, false);
             }
-            return true; // Evita que la tecla haga otras cosas en el juego
+            return true;
         }
 
-        // --- LÓGICA DE CHECKPOINTS ---
-        // Solo funciona en modo práctica, cuando se presiona la tecla (no repetición)
-        if (playLayer->m_isPracticeMode && isKeyDown && !isKeyRepeat) {
-            auto checkKey = Mod::get()->getSettingValue<enumKeyCodes>("checkpoint-key");
-            auto removeKey = Mod::get()->getSettingValue<enumKeyCodes>("remove-checkpoint-key");
-
-            if (key == checkKey) {
-                playLayer->createCheckpoint();
-                return true;
-            }
-            if (key == removeKey) {
-                playLayer->removeLastCheckpoint();
-                return true;
-            }
-        }
-
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, isKeyDown, isKeyRepeat, p3);
+        // Si es cualquier otro botón (Click izquierdo, etc), dejamos que el juego actúe normal
+        return CCMouseDispatcher::dispatchMouseEvent(event, button, x, y);
     }
 };
