@@ -19,30 +19,31 @@ class $modify(CCKeyboardDispatcher) {
 
 // ── MOUSE ─────────────────────────────────────────────────────────────────────
 $execute {
-    new EventListener<geode::MouseInputEvent>(+[](geode::MouseInputData& data) {
+    new EventListener<EventFilter<geode::MouseInputEvent>>(+[](geode::MouseInputEvent* ev) {
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return false;
+        if (!kbd) return ListenerResult::Propagate;
 
+        auto& data = ev->getData(); // o como exponga el evento su data
         bool down = (data.action == geode::MouseInputData::Action::Press);
 
         if (data.button == geode::MouseInputData::Button::Right) {
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return true;
+            return ListenerResult::Stop;
         }
         if (data.button == geode::MouseInputData::Button::Middle) {
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return true;
+            return ListenerResult::Stop;
         }
 
-        return false;
+        return ListenerResult::Propagate;
     });
 
-    new EventListener<geode::ScrollWheelEvent>(+[](double x, double y) {
+    new EventListener<EventFilter<geode::ScrollWheelEvent>>(+[](geode::ScrollWheelEvent* ev) {
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return false;
+        if (!kbd) return ListenerResult::Propagate;
 
         kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true,  false, 0.0);
         kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
-        return true;
+        return ListenerResult::Stop;
     });
 }
