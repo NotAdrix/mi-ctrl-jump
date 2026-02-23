@@ -1,98 +1,60 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/UILayer.hpp>
-// Estos son los bindeos correctos para Cocos2d en Geode v5
-#include <Geode/cocos/include/cocos2d.h>
 
 using namespace geode::prelude;
 
-struct $modify(MyUILayer, UILayer) {
-    static void onModify(auto& self) {
-        // Prioridad Late para interceptar antes que el juego procese el input
-        (void)self.setHookPriority("UILayer::handleKeypress", Priority::Late);
-    }
+$execute {
+    // ── TECLADO: L-Ctrl -> Espacio (Automático y Enmascarado) ──────────────
+    geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
+        auto kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return ListenerResult::Propagate;
 
-    // Bandera de control para evitar bucles infinitos
-    static inline bool allowKeyDownThrough = false;
+        // Si la tecla es CUALQUIER variante de Control
+        if (data.key == geode::Key::LeftControl || 
+            data.key == geode::Key::RightControl || 
+            data.key == geode::Key::Control) {
+            
+            bool down = (data.action != geode::KeyboardInputData::Action::Release);
+            bool repeat = (data.action == geode::KeyboardInputData::Action::Repeat);
+            
+            // ENMASCARAMIENTO: Guardamos el estado original y apagamos el "Control"
+            // Esto evita que el motor lea "Ctrl + Espacio" y haga cosas raras
+            bool oldCtrl = kbd->m_bControlPressed;
+            kbd->m_bControlPressed = false;
 
-    // EL HACK PRO: Simula una tecla mientras manipula los modificadores (Ctrl/Shift)
-    void pressKeyFallthrough(enumKeyCodes key, bool down, double timestamp) {
-        if (!this->isCurrentPlayLayer()) return;
+            // Disparamos el Espacio puro
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, repeat, data.timestamp);
 
-        auto dispatcher = CCDirector::sharedDirector()->getKeyboardDispatcher();
+            // Restauramos el estado internamente por seguridad
+            kbd->m_bControlPressed = oldCtrl;
 
-        // Guardamos el estado real de las teclas modificadoras
-        auto oShift = dispatcher->getShiftKeyPressed();
-        auto oCtrl = dispatcher->getControlKeyPressed();
-        auto oAlt = dispatcher->getAltKeyPressed();
-        auto oCmd = dispatcher->getCommandKeyPressed();
-
-        // DESACTIVAMOS el Control para el motor (enmascaramiento)
-        // Esto evita que el juego crea que es un comando de sistema (como Ctrl+R)
-        dispatcher->updateModifierKeys(oShift, false, oAlt, oCmd);
-
-        allowKeyDownThrough = true;
-        if (down) {
-            this->keyDown(key, timestamp);
-        } else {
-            this->keyUp(key, timestamp);
+            // Frenamos en seco la señal original de Control
+            return ListenerResult::Stop;
         }
-        allowKeyDownThrough = false;
 
-        // Restauramos el estado original para no romper el sistema
-        dispatcher->updateModifierKeys(oShift, oCtrl, oAlt, oCmd);
-    }
+        // Dejamos pasar todas las demás teclas con normalidad (¡para que puedas jugar!)
+        return ListenerResult::Propagate;
+    }).leak();
 
-    bool isCurrentPlayLayer() {
-        auto playLayer = PlayLayer::get();
-        return playLayer != nullptr && playLayer->getChildByType<UILayer>(0) == this;
-    }
 
-    bool init(GJBaseGameLayer* layer) {
-        if (!UILayer::init(layer)) return false;
+    // ── MOUSE: Click Derecho -> Z | Rueda -> X (Automático) ────────────────
+    geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
+        auto kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return ListenerResult::Propagate;
 
-        // Esperamos un frame para que PlayLayer esté listo
-        geode::Loader::get()->queueInMainThread([this] {
-            if (!PlayLayer::get()) return;
+        bool down = (data.action == geode::MouseInputData::Action::Press);
 
-            // --- Lógica de Teclado (Ctrl -> Space) ---
-            this->defineKeybind("jump-p1", [this](bool down, bool repeat, double timestamp) {
-                if (repeat) return ListenerResult::Propagate;
-                
-                // Usamos queueButton para la latencia cero (físicas directas)
-                PlayLayer::get()->queueButton(1, down, false, timestamp);
-                
-                // Realizamos el enmascaramiento: el juego "ve" un Space sin Ctrl
-                this->pressKeyFallthrough(KEY_Space, down, timestamp);
-                
-                return ListenerResult::Stop; 
-            });
-
-            // --- Lógica de Mouse (Right Click -> Z) ---
-            this->defineKeybind("place-checkpoint", [this](bool down, bool repeat, double timestamp) {
-                if (repeat) return ListenerResult::Propagate;
-                this->pressKeyFallthrough(KEY_Z, down, timestamp);
-                return ListenerResult::Stop;
-            });
-        });
-
-        return true;
-    }
-
-    // Helper para registrar el evento de Geode v5 sin colisionar
-    void defineKeybind(std::string id, std::function<ListenerResult(bool, bool, double)> callback) {
-        PlayLayer::get()->addEventListener(
-            KeybindSettingPressedEventV3(Mod::get(), std::move(id)),
-            [callback = std::move(callback)](Keybind const&, bool down, bool repeat, double timestamp) {
-                return callback(down, repeat, timestamp);
-            }
-        );
-    }
-
-    // Capturamos la pulsación para dejarla pasar solo si nuestro mod lo permite
-    void handleKeypress(cocos2d::enumKeyCodes key, bool down, double timestamp) {
-        if (key == enumKeyCodes::KEY_Escape || allowKeyDownThrough) {
-            UILayer::handleKeypress(key, down, timestamp);
-            allowKeyDownThrough = false;
+        // Click Derecho = Poner Checkpoint (Z)
+        if (data.button == geode::MouseInputData::Button::Right) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, data.timestamp);
+            return ListenerResult::Stop;
         }
-    }
-};
+        
+        // Click de Rueda = Borrar Checkpoint (X)
+        if (data.button == geode::MouseInputData::Button::Middle) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, data.timestamp);
+            return ListenerResult::Stop;
+        }
+
+        return ListenerResult::Propagate;
+    }).leak();
+}
