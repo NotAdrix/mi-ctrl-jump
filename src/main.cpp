@@ -1,60 +1,53 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/binding/PlayLayer.hpp>
-#include <Geode/binding/PlayerObject.hpp>
-
-#ifdef GEODE_IS_WINDOWS
-#include <Windows.h>
-#endif
 
 using namespace geode::prelude;
 
-// Variables de estado únicas (evita el error de redefinición)
-static bool g_ctrlDownState = false;
-static bool g_rightDownState = false;
-static bool g_middleDownState = false;
+/**
+ * ESTA ES LA SOLUCIÓN CBF-COMPATIBLE.
+ * Interceptamos el evento en el aire y le cambiamos el nombre a la tecla 
+ * ANTES de que el motor la procese, conservando el 'time' (sub-frame timing).
+ */
+class $modify(CCKeyboardDispatcher) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
+        // En Geode v5/GD 2.2081, KEY_Control atrapa cualquier Ctrl físico.
+        if (key == enumKeyCodes::KEY_Control) {
+            // Cambiamos 'key' a Space, pero mantenemos el 'time' intacto.
+            // Esto permite que el CBF lea el espacio con la precisión del Ctrl.
+            key = enumKeyCodes::KEY_Space;
+        }
 
-class $modify(CCScheduler) {
-    void update(float dt) {
-        CCScheduler::update(dt);
+        // Si es el Click Derecho (en algunos teclados se mapea aquí) o si quieres
+        // usar el despachador para la Z y X:
+        // (Nota: Para máxima precisión en mouse, se suele usar otro hook, 
+        // pero esto es 100% seguro para el teclado).
 
-#ifdef GEODE_IS_WINDOWS
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
+    }
+};
+
+/**
+ * Para el mouse, si CCMouseDispatcher fallaba, usaremos un hook de bajo nivel
+ * en el protocolo de la ventana para mantener la compatibilidad y el CBF.
+ */
+#include <Geode/modify/CCEGLViewProtocol.hpp>
+
+class $modify(CCEGLViewProtocol) {
+    void onMouseButton(int button, int action, int mods) {
+        // action 1 = presionar, 0 = soltar
+        bool isDown = (action == 1);
         auto kbd = CCKeyboardDispatcher::get();
-        auto playLayer = PlayLayer::get();
 
-        // 1. SOLUCIÓN PARA CTRL (SALTO DIRECTO)
-        bool currentCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-        if (currentCtrl != g_ctrlDownState) {
-            g_ctrlDownState = currentCtrl;
-            
-            // Si estamos jugando, le ordenamos al objeto físico saltar
-            if (playLayer && playLayer->m_player1) {
-                if (g_ctrlDownState) {
-                    playLayer->m_player1->pushButton(PlayerButton::Jump);
-                } else {
-                    playLayer->m_player1->releaseButton(PlayerButton::Jump);
-                }
-            } 
-            // En menús, mandamos la tecla Space normal
-            if (kbd) {
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, g_ctrlDownState, false, 0.0);
-            }
+        // 1 = Click Derecho, 2 = Ruedita
+        if (button == 1) {
+            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, isDown, false, 0.0);
+            return;
+        }
+        if (button == 2) {
+            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, isDown, false, 0.0);
+            return;
         }
 
-        // 2. SOLUCIÓN PARA CLICK DERECHO (Z)
-        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-        if (currentRight != g_rightDownState) {
-            g_rightDownState = currentRight;
-            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, g_rightDownState, false, 0.0);
-        }
-
-        // 3. SOLUCIÓN PARA RUEDITA (X)
-        bool currentMiddle = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
-        if (currentMiddle != g_middleDownState) {
-            g_middleDownState = currentMiddle;
-            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, g_middleDownState, false, 0.0);
-        }
-#endif
+        CCEGLViewProtocol::onMouseButton(button, action, mods);
     }
 };
