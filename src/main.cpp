@@ -9,11 +9,13 @@ $execute {
         auto mod = Mod::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        // Obtenemos el bindeo como enumKeyCodes (tipo correcto en Geode v5)
-        auto key1 = mod->getSettingValue<enumKeyCodes>("jump-keybind");
-        auto key2 = mod->getSettingValue<enumKeyCodes>("jump-keybind-2");
+        // Obtenemos el bindeo como int64_t y lo casteamos a enumKeyCodes
+        // (getSettingValue no soporta enumKeyCodes directamente en Geode v5)
+        auto key1 = static_cast<enumKeyCodes>(mod->getSettingValue<int64_t>("jump-keybind"));
+        auto key2 = static_cast<enumKeyCodes>(mod->getSettingValue<int64_t>("jump-keybind-2"));
 
-        // Convertimos ambos a int para comparación rápida
+        // Convertimos ambos a int. Esto elimina errores de tipos y asegura
+        // que la comparación sea la operación más rápida posible del CPU.
         int pressedKey = static_cast<int>(data.key);
         int target1 = static_cast<int>(key1);
         int target2 = static_cast<int>(key2);
