@@ -1,24 +1,25 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/utils/Keyboard.hpp>
 #include <Geode/loader/Event.hpp>
 
 using namespace geode::prelude;
 
-// ── TECLADO (CBF-preciso) ─────────────────────────────────────────────────────
-class $modify(CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
-        if (key == enumKeyCodes::KEY_Control) {
-            return CCKeyboardDispatcher::dispatchKeyboardMSG(
-                enumKeyCodes::KEY_Space, down, repeat, time
-            );
-        }
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
-    }
-};
-
-// ── MOUSE ─────────────────────────────────────────────────────────────────────
 $execute {
+    // Ctrl -> Space (CBF-preciso: pasamos el mismo timestamp)
+    geode::KeyboardInputEvent().listen(+[](geode::KeyboardInputData& data) {
+        if (data.key == enumKeyCodes::KEY_Control) {
+            auto kbd = CCKeyboardDispatcher::get();
+            if (!kbd) return ListenerResult::Propagate;
+
+            bool down   = (data.action == geode::KeyboardInputData::Action::Press);
+            bool repeat = (data.action == geode::KeyboardInputData::Action::Repeat);
+
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down || repeat, repeat, data.timestamp);
+            return ListenerResult::Stop;
+        }
+        return ListenerResult::Propagate;
+    }).leak();
+
     // Click derecho -> Z, click central -> X
     geode::MouseInputEvent().listen(+[](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
