@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
-set(CMAKE_CXX_STANDARD 20)           <-- CAMBIA ESTO (era 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_definitions(FMT_ENFORCE_COMPILE_STRING=0) <-- AÑADE ESTO
+add_compile_definitions(FMT_ENFORCE_COMPILE_STRING=0)
 
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
     set(CMAKE_OSX_ARCHITECTURES "arm64")
