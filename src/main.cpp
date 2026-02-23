@@ -43,12 +43,12 @@ $execute {
         bool shouldRemap = false;
 
         // Verificamos si la tecla que se tocó está habilitada en los settings
-        if (keyId == 162 && mod->getSettingValue<bool>("l-ctrl"))  shouldRemap = true;
-        if (keyId == 163 && mod->getSettingValue<bool>("r-ctrl"))  shouldRemap = true;
-        if (keyId == 160 && mod->getSettingValue<bool>("l-shift")) shouldRemap = true;
-        if (keyId == 161 && mod->getSettingValue<bool>("r-shift")) shouldRemap = true;
-        if (keyId == 164 && mod->getSettingValue<bool>("l-alt"))   shouldRemap = true;
-        if (keyId == 165 && mod->getSettingValue<bool>("r-alt"))   shouldRemap = true;
+        if (data.key == geode::Key::LeftControl  && mod->getSettingValue<bool>("l-ctrl"))  shouldRemap = true;
+        if (data.key == geode::Key::RightControl && mod->getSettingValue<bool>("r-ctrl"))  shouldRemap = true;
+        if (data.key == geode::Key::LeftShift    && mod->getSettingValue<bool>("l-shift")) shouldRemap = true;
+        if (data.key == geode::Key::RightShift   && mod->getSettingValue<bool>("r-shift")) shouldRemap = true;
+        if (data.key == geode::Key::LeftAlt     && mod->getSettingValue<bool>("l-alt"))   shouldRemap = true;
+        if (data.key == geode::Key::RightAlt    && mod->getSettingValue<bool>("r-alt"))   shouldRemap = true;
 
         if (shouldRemap) {
             bool down = (data.action != geode::KeyboardInputData::Action::Release);
