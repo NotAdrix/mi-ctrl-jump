@@ -1,46 +1,59 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCMouseDispatcher.hpp>
+#include <Geode/modify/CCScheduler.hpp>
+
+#ifdef GEODE_IS_WINDOWS
+#include <Windows.h>
+#endif
 
 using namespace geode::prelude;
 
 /**
- * REASIGNACIÓN DE TECLADO
- * Corregido para GD 2.2081: Firma de 4 argumentos y retorno bool.
+ * 1. REASIGNACIÓN DE TECLADO (Ctrl -> Space)
+ * (Esta parte funcionó perfectamente en tu última compilación)
  */
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
-        // Sustitución de identidad: Ctrl ahora es Space.
         if (key == enumKeyCodes::KEY_Control) {
             key = enumKeyCodes::KEY_Space;
         }
-        // Pasamos los 4 parámetros (key, down, repeat, time) a la original.
         return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
     }
 };
 
 /**
- * REASIGNACIÓN DE MOUSE
- * Corregido para GD 2.2081: La función se llama 'mouseButton'.
- * Usamos 'int' para el botón para evitar errores de tipos desconocidos.
+ * 2. REASIGNACIÓN DE RATÓN (Click Derecho -> Z, Ruedita -> X)
+ * Leemos el ratón directamente desde el sistema, ignorando los errores de Cocos2d-x.
  */
-class $modify(CCMouseDispatcher) {
-    void mouseButton(int button, bool down, bool doubleClick) {
+#ifdef GEODE_IS_WINDOWS
+
+// Variables para recordar si el botón ya estaba presionado y no mandar spam
+static bool g_rightDown = false;
+static bool g_middleDown = false;
+
+class $modify(CCScheduler) {
+    void update(float dt) {
+        // Llamamos al reloj original para no romper el juego
+        CCScheduler::update(dt);
+        
         auto kbd = CCKeyboardDispatcher::get();
-
-        // En Cocos2d-x (RobTop): 1 es Click Derecho, 2 es Click Ruedita.
-        if (button == 1) { // Click Derecho
-            // Mandamos la señal al teclado (Tecla Z, presionado, no repetir, tiempo 0.0)
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return; // Bloqueamos el click original
+        if (!kbd) return; // Por seguridad
+        
+        // --- Interceptar Click Derecho (VK_RBUTTON) ---
+        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+        if (currentRight != g_rightDown) {
+            g_rightDown = currentRight;
+            // Enviamos la tecla Z al juego
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, currentRight, false, 0.0);
         }
-
-        if (button == 2) { // Click Ruedita
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return;
+        
+        // --- Interceptar Click de Ruedita (VK_MBUTTON) ---
+        bool currentMiddle = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+        if (currentMiddle != g_middleDown) {
+            g_middleDown = currentMiddle;
+            // Enviamos la tecla X al juego
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, currentMiddle, false, 0.0);
         }
-
-        // El resto (click izquierdo, etc) sigue normal
-        CCMouseDispatcher::mouseButton(button, down, doubleClick);
     }
 };
+#endif
