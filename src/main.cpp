@@ -3,21 +3,23 @@
 using namespace geode::prelude;
 
 $execute {
-    // ── TECLADO: Remapeo y Enmascaramiento Puro ─────────────────────────────
+    // ── TECLADO: Remapeo usando IDs Universales ─────────────────────────────
     geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         auto mod = Mod::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        auto key1 = mod->getSettingValue<geode::Key>("jump-keybind");
-        auto key2 = mod->getSettingValue<geode::Key>("jump-keybind-2");
+        // Usamos enumKeyCodes para evitar errores de nombres en el compilador
+        auto key1 = mod->getSettingValue<enumKeyCodes>("jump-keybind");
+        auto key2 = mod->getSettingValue<enumKeyCodes>("jump-keybind-2");
 
-        // Si coincide con cualquiera de los dos bindeos:
-        if (data.key == key1 || data.key == key2) {
+        // Convertimos la tecla presionada al mismo tipo para comparar
+        auto pressedKey = static_cast<enumKeyCodes>(data.key);
+
+        if (pressedKey == key1 || pressedKey == key2) {
             bool down = (data.action != geode::KeyboardInputData::Action::Release);
             
-            // 1. Enmascaramos el input original hacia el motor del juego
-            // 2. Despachamos el salto (Espacio) con precisión de hardware (timestamp)
+            // Enviamos el salto (Space)
             kbd->dispatchKeyboardMSG(
                 enumKeyCodes::KEY_Space, 
                 down, 
@@ -25,7 +27,6 @@ $execute {
                 data.timestamp
             );
 
-            // Bloqueamos la propagación: el juego nunca se entera de que tocaste la tecla original
             return ListenerResult::Stop;
         }
 
@@ -39,13 +40,11 @@ $execute {
 
         bool down = (data.action == geode::MouseInputData::Action::Press);
         
-        // Click Derecho -> Z (Enmascarado)
         if (data.button == geode::MouseInputData::Button::Right) {
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, data.timestamp);
             return ListenerResult::Stop;
         }
         
-        // Click de Rueda (Middle) -> X (Enmascarado)
         if (data.button == geode::MouseInputData::Button::Middle) {
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, data.timestamp);
             return ListenerResult::Stop;
