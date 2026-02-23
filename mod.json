@@ -5,10 +5,10 @@
         "android": "2.2074"
     },
     "id": "notadrix.mi_ctrl_jump",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
-    "description": "Remapeo global con precisión zero-latency. Configura modificadores como salto y usa el mouse para checkpoints rápidos.",
+    "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita (clic) -> X.",
     "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "early-load": true,
     "tags": [
@@ -16,17 +16,23 @@
         "utility"
     ],
     "settings": {
-        "l-ctrl": { "name": "Left Control", "type": "bool", "default": true },
-        "r-ctrl": { "name": "Right Control", "type": "bool", "default": false },
-        "l-shift": { "name": "Left Shift", "type": "bool", "default": false },
-        "r-shift": { "name": "Right Shift", "type": "bool", "default": false },
-        "l-alt": { "name": "Left Alt", "type": "bool", "default": false },
-        "r-alt": { "name": "Right Alt", "type": "bool", "default": false },
-        "rapid-checkpoints": { 
-            "name": "Rapid Checkpoints (Mouse)", 
-            "description": "Click Derecho -> Z | Click Central o Scroll -> X",
-            "type": "bool", 
-            "default": true 
+        "jump-keybind": {
+            "name": "Tecla de Salto 1",
+            "description": "Primera tecla para saltar (ej. L-Ctrl).",
+            "type": "keybind",
+            "default": "l-ctrl"
+        },
+        "jump-keybind-2": {
+            "name": "Tecla de Salto 2",
+            "description": "Segunda tecla opcional (ej. Shift).",
+            "type": "keybind",
+            "default": "none"
+        },
+        "rapid-checkpoints": {
+            "name": "Rapid Checkpoints (Mouse)",
+            "description": "Habilita Click Derecho -> Z y Click Rueda -> X.",
+            "type": "bool",
+            "default": true
         }
     }
 }
