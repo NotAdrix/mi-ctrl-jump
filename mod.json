@@ -5,27 +5,28 @@
         "android": "2.2074"
     },
     "id": "notadrix.mi_ctrl_jump",
-    "version": "v1.0.0",
+    "version": "1.0.0",
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
-    "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita -> X.",
-    "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
+    "description": "Remapeo global con precisión zero-latency. Configura modificadores como salto y usa el mouse para checkpoints rápidos.",
+    "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
+    "early-load": true,
     "tags": [
         "gameplay",
         "utility"
     ],
     "settings": {
-        "l-ctrl": { "name": "L-ctrl =", "type": "bool", "default": true },
-        "r-ctrl": { "name": "R-ctrl =", "type": "bool", "default": false },
-        "l-shift": { "name": "L-shift =", "type": "bool", "default": false },
-        "r-shift": { "name": "R-shift =", "type": "bool", "default": false },
-        "l-alt": { "name": "L-alt =", "type": "bool", "default": false },
-        "r-alt": { "name": "R-alt =", "type": "bool", "default": false },
+        "l-ctrl": { "name": "Left Control", "type": "bool", "default": true },
+        "r-ctrl": { "name": "Right Control", "type": "bool", "default": false },
+        "l-shift": { "name": "Left Shift", "type": "bool", "default": false },
+        "r-shift": { "name": "Right Shift", "type": "bool", "default": false },
+        "l-alt": { "name": "Left Alt", "type": "bool", "default": false },
+        "r-alt": { "name": "Right Alt", "type": "bool", "default": false },
         "rapid-checkpoints": { 
-            "name": "Enable rapidcheckpoints with mouse =", 
-            "description": "Click derecho -> Z, Click central/Ruedita -> X",
+            "name": "Rapid Checkpoints (Mouse)", 
+            "description": "Click Derecho -> Z | Click Central o Scroll -> X",
             "type": "bool", 
             "default": true 
         }
     }
-} 
+}
