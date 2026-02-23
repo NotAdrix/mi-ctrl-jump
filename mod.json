@@ -8,10 +8,23 @@
     "version": "v1.0.0",
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
-    "description": "Remapeo global: Ctrl -> Space, Click Derecho -> Z, Ruedita -> X.",
+    "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita -> X.",
     "tags": [
         "gameplay",
         "utility"
     ],
-    "settings": {}
+    "settings": {
+        "l-ctrl": { "name": "L-ctrl =", "type": "bool", "default": true },
+        "r-ctrl": { "name": "R-ctrl =", "type": "bool", "default": false },
+        "l-shift": { "name": "L-shift =", "type": "bool", "default": false },
+        "r-shift": { "name": "R-shift =", "type": "bool", "default": false },
+        "l-alt": { "name": "L-alt =", "type": "bool", "default": false },
+        "r-alt": { "name": "R-alt =", "type": "bool", "default": false },
+        "rapid-checkpoints": { 
+            "name": "Enable rapidcheckpoints with mouse =", 
+            "description": "Click derecho -> Z, Click central/Ruedita -> X",
+            "type": "bool", 
+            "default": true 
+        }
+    }
 }
