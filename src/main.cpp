@@ -1,56 +1,121 @@
 #include <Geode/Geode.hpp>
+#include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCEGLViewProtocol.hpp>
+#include <Geode/modify/PlayerObject.hpp>
+
+#ifdef GEODE_IS_WINDOWS
+#include <Windows.h>
+#endif
 
 using namespace geode::prelude;
 
-/**
- * 1. TECLADO (Ctrl -> Space)
- * Usamos KEY_Control (el único que existe en el enum de v5).
- * Se añaden los 4 argumentos y el retorno bool para cumplir con GD 2.2081.
- */
-class $modify(CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
-        // En Geode v5, KEY_Control engloba ambos controles físicos.
-        if (key == enumKeyCodes::KEY_Control) {
-            key = enumKeyCodes::KEY_Space;
-        }
-        
-        // Retornamos la función original con los 4 parámetros exactos.
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, time);
-    }
-};
+// Variables de estado para evitar spam de teclas
+static bool g_ctrlDown = false;
+static bool g_rightDown = false;
+static bool g_middleDown = false;
 
 /**
- * 2. MOUSE (Click Derecho -> Z, Ruedita -> X)
- * Hookeamos CCEGLViewProtocol, que es infalible en Geode v5.
- * Mantiene la precisión de alta velocidad (ideal para CBF).
+ * REASIGNACIÓN GLOBAL Y DE GAMEPLAY
+ * Esta versión lee el hardware (infalible) y ejecuta el salto directamente
+ * en el objeto del jugador (compatibilidad total con 2.2 y CBF).
  */
-class $modify(CCEGLViewProtocol) {
-    void onMouseButton(int button, int action, int mods) {
+class $modify(CCScheduler) {
+    void update(float dt) {
+        CCScheduler::update(dt);
+
+#ifdef GEODE_IS_WINDOWS
+        // Obtenemos el estado de la partida actual
+        auto playLayer = PlayLayer::get();
         auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) {
-            CCEGLViewProtocol::onMouseButton(button, action, mods);
-            return;
+
+        // 1. DETECCIÓN DE CONTROL (Salto / Espacio)
+        bool currentCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+        if (currentCtrl != g_ctrlDown) {
+            g_ctrlDown = currentCtrl;
+            
+            if (playLayer && playLayer->m_player1) {
+                // Si estamos jugando, forzamos el salto directo (Precisión Máxima)
+                if (g_ctrlDown) playLayer->m_player1->pushButton(PlayerButton::Jump);
+                else playLayer->m_player1->releaseButton(PlayerButton::Jump);
+            } else if (kbd) {
+                // Si estamos en un menú, mandamos un Espacio normal
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, g_ctrlDown, false, 0.0);
+            }
         }
 
-        // action 1 = Presionado, action 0 = Soltado
-        bool isDown = (action == 1);
-
-        // Click Derecho (ID 1 en el protocolo de ventana) -> Tecla Z
-        if (button == 1) { 
-            // Mandamos Z con timestamp 0.0 (el motor le asignará el tiempo actual)
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, isDown, false, 0.0);
-            return; 
+        // 2. DETECCIÓN DE CLICK DERECHO (Tecla Z)
+        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+        if (currentRight != g_rightDown) {
+            g_rightDown = currentRight;
+            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, g_rightDown, false, 0.0);
         }
 
-        // Click Ruedita (ID 2 en el protocolo de ventana) -> Tecla X
-        if (button == 2) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, isDown, false, 0.0);
-            return;
+        // 3. DETECCIÓN DE RUEDITA (Tecla X)
+        bool currentMiddle = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+        if (currentMiddle != g_middleDown) {
+            g_middleDown = currentMiddle;
+            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, g_middleDown, false, 0.0);
+        }
+#endif
+    }
+};#include <Geode/Geode.hpp>
+#include <Geode/modify/CCScheduler.hpp>
+#include <Geode/modify/CCKeyboardDispatcher.hpp>
+#include <Geode/modify/PlayerObject.hpp>
+
+#ifdef GEODE_IS_WINDOWS
+#include <Windows.h>
+#endif
+
+using namespace geode::prelude;
+
+// Variables de estado para evitar spam de teclas
+static bool g_ctrlDown = false;
+static bool g_rightDown = false;
+static bool g_middleDown = false;
+
+/**
+ * REASIGNACIÓN GLOBAL Y DE GAMEPLAY
+ * Esta versión lee el hardware (infalible) y ejecuta el salto directamente
+ * en el objeto del jugador (compatibilidad total con 2.2 y CBF).
+ */
+class $modify(CCScheduler) {
+    void update(float dt) {
+        CCScheduler::update(dt);
+
+#ifdef GEODE_IS_WINDOWS
+        // Obtenemos el estado de la partida actual
+        auto playLayer = PlayLayer::get();
+        auto kbd = CCKeyboardDispatcher::get();
+
+        // 1. DETECCIÓN DE CONTROL (Salto / Espacio)
+        bool currentCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+        if (currentCtrl != g_ctrlDown) {
+            g_ctrlDown = currentCtrl;
+            
+            if (playLayer && playLayer->m_player1) {
+                // Si estamos jugando, forzamos el salto directo (Precisión Máxima)
+                if (g_ctrlDown) playLayer->m_player1->pushButton(PlayerButton::Jump);
+                else playLayer->m_player1->releaseButton(PlayerButton::Jump);
+            } else if (kbd) {
+                // Si estamos en un menú, mandamos un Espacio normal
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, g_ctrlDown, false, 0.0);
+            }
         }
 
-        // Todo lo demás sigue su curso
-        CCEGLViewProtocol::onMouseButton(button, action, mods);
+        // 2. DETECCIÓN DE CLICK DERECHO (Tecla Z)
+        bool currentRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+        if (currentRight != g_rightDown) {
+            g_rightDown = currentRight;
+            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, g_rightDown, false, 0.0);
+        }
+
+        // 3. DETECCIÓN DE RUEDITA (Tecla X)
+        bool currentMiddle = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+        if (currentMiddle != g_middleDown) {
+            g_middleDown = currentMiddle;
+            if (kbd) kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, g_middleDown, false, 0.0);
+        }
+#endif
     }
 };
