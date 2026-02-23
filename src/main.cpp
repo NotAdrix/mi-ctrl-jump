@@ -1,10 +1,10 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCMouseDispatcher.hpp>
+#include <Geode/utils/Keyboard.hpp>
 
 using namespace geode::prelude;
 
-// ── TECLADO ──────────────────────────────────────────────────────────────────
+// ── TECLADO (CBF-preciso) ─────────────────────────────────────────────────────
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double time) {
         if (key == enumKeyCodes::KEY_Control) {
@@ -16,30 +16,32 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
-// ── MOUSE ────────────────────────────────────────────────────────────────────
-class $modify(CCMouseDispatcher) {
-    bool dispatchScrollMSG(float x, float y) {
+// ── MOUSE ─────────────────────────────────────────────────────────────────────
+$execute {
+    new EventListener<geode::MouseInputEvent>(+[](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
-        if (kbd) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true,  false, 0.0);
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
-        }
-        return true;
-    }
+        if (!kbd) return false;
 
-    bool dispatchMouseButtonMSG(int button, bool down, float x, float y) {
-        auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return CCMouseDispatcher::dispatchMouseButtonMSG(button, down, x, y);
+        bool down = (data.action == geode::MouseInputData::Action::Press);
 
-        if (button == 1) { // Derecho -> Z
+        if (data.button == geode::MouseInputData::Button::Right) {
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
             return true;
         }
-        if (button == 2) { // Central -> X
+        if (data.button == geode::MouseInputData::Button::Middle) {
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
             return true;
         }
 
-        return CCMouseDispatcher::dispatchMouseButtonMSG(button, down, x, y);
-    }
-};
+        return false;
+    });
+
+    new EventListener<geode::ScrollWheelEvent>(+[](double x, double y) {
+        auto kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return false;
+
+        kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true,  false, 0.0);
+        kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
+        return true;
+    });
+}
