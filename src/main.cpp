@@ -14,11 +14,14 @@
   #include <linux/input.h>
   #include <sys/ioctl.h>
 
+  // OPTIMIZACIÓN LINUX: Busca el teclado una vez y mantiene el archivo abierto
   static int getKbdFd() {
       static int kbdFd = -2;
       if (kbdFd != -2) return kbdFd;
+
       DIR* dir = opendir("/dev/input");
       if (!dir) return kbdFd = -1;
+
       struct dirent* ent;
       while ((ent = readdir(dir)) != nullptr) {
           if (strncmp(ent->d_name, "event", 5) != 0) continue;
@@ -26,16 +29,13 @@
           snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
           int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
           if (fd < 0) continue;
+
           uint8_t evbits[(EV_MAX + 7) / 8] = {};
           if (ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), evbits) >= 0) {
-              if ((evbits[EV_KEY / 8] & (1 << (EV_KEY % 8)))) {
-                  uint8_t keybits[(KEY_MAX + 7) / 8] = {};
-                  if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits) >= 0) {
-                      if (keybits[KEY_Q / 8] & (1 << (KEY_Q % 8))) {
-                          closedir(dir);
-                          return kbdFd = fd; 
-                      }
-                  }
+              if (evbits[EV_KEY / 8] & (1 << (EV_KEY % 8))) {
+                  kbdFd = fd;
+                  closedir(dir);
+                  return kbdFd;
               }
           }
           close(fd);
@@ -64,7 +64,7 @@
 
 using namespace geode::prelude;
 
-// ── Helpers de Hardware (Todas las teclas definidas) ───────────────────────
+// ── HELPERS DE HARDWARE: Detectan qué lado (L/R) se está presionando ───────
 
 static bool isLCtrlDown() {
 #ifdef GEODE_IS_WINDOWS
@@ -72,7 +72,7 @@ static bool isLCtrlDown() {
 #elif defined(GEODE_IS_LINUX)
     return evdevKeyDown(KEY_LEFTCTRL);
 #elif defined(GEODE_IS_MAC)
-    return macKeyDown(0x3B); 
+    return macKeyDown(0x3B);
 #else
     return false;
 #endif
@@ -143,23 +143,27 @@ static bool isRAltDown() {
 $execute {
     static bool modIsActive = false;
 
+    // ── TECLADO: Remapeo Universal ───────────────────────────────────────────
     geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         auto mod = Mod::get();
         if (!kbd) return ListenerResult::Propagate;
 
         bool shouldRemap = false;
+        auto key = data.key;
 
-        // Corregido: geode::Key explícito para el compilador
-        if (data.key == geode::Key::Control) {
+        // Comprobación de Control
+        if (key == KEY_Control) {
             if ((mod->getSettingValue<bool>("l-ctrl") && isLCtrlDown()) || 
                 (mod->getSettingValue<bool>("r-ctrl") && isRCtrlDown())) shouldRemap = true;
         }
-        else if (data.key == geode::Key::Shift) {
+        // Comprobación de Shift
+        else if (key == KEY_Shift) {
             if ((mod->getSettingValue<bool>("l-shift") && isLShiftDown()) || 
                 (mod->getSettingValue<bool>("r-shift") && isRShiftDown())) shouldRemap = true;
         }
-        else if (data.key == geode::Key::Alt) {
+        // Comprobación de Alt
+        else if (key == KEY_Alt) {
             if ((mod->getSettingValue<bool>("l-alt") && isLAltDown()) || 
                 (mod->getSettingValue<bool>("r-alt") && isRAltDown())) shouldRemap = true;
         }
@@ -167,19 +171,20 @@ $execute {
         if (shouldRemap) {
             bool down = (data.action != geode::KeyboardInputData::Action::Release);
             modIsActive = down;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, (data.action == geode::KeyboardInputData::Action::Repeat), data.timestamp);
+            kbd->dispatchKeyboardMSG(KEY_Space, down, (data.action == geode::KeyboardInputData::Action::Repeat), data.timestamp);
             return ListenerResult::Stop;
         }
 
-        // Sincronización pasiva para evitar el "salto pegado"
+        // Sincronización pasiva (Evita saltos pegados si se pierde un evento)
         if (modIsActive && !isLCtrlDown() && !isRCtrlDown() && !isLShiftDown() && !isRShiftDown() && !isLAltDown() && !isRAltDown()) {
             modIsActive = false;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, false, false, data.timestamp);
+            kbd->dispatchKeyboardMSG(KEY_Space, false, false, data.timestamp);
         }
 
         return ListenerResult::Propagate;
     }).leak();
 
+    // ── MOUSE Y SCROLL: Checkpoints Rápidos ──────────────────────────────────
     geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd) return ListenerResult::Propagate;
@@ -187,11 +192,11 @@ $execute {
         if (Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
             bool down = (data.action == geode::MouseInputData::Action::Press);
             if (data.button == geode::MouseInputData::Button::Right) {
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, data.timestamp);
+                kbd->dispatchKeyboardMSG(KEY_Z, down, false, data.timestamp);
                 return ListenerResult::Stop;
             }
             if (data.button == geode::MouseInputData::Button::Middle) {
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, data.timestamp);
+                kbd->dispatchKeyboardMSG(KEY_X, down, false, data.timestamp);
                 return ListenerResult::Stop;
             }
         }
@@ -202,8 +207,8 @@ $execute {
         if (Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
             auto kbd = CCKeyboardDispatcher::get();
             if (kbd) {
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true,  false, 0.0);
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
+                kbd->dispatchKeyboardMSG(KEY_X, true,  false, 0.0);
+                kbd->dispatchKeyboardMSG(KEY_X, false, false, 0.0);
                 return ListenerResult::Stop;
             }
         }
