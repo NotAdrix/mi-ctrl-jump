@@ -1,24 +1,26 @@
 #include <Geode/Geode.hpp>
-#include <Geode/loader/SettingV3.hpp>
 
 using namespace geode::prelude;
 
 $execute {
-    // ── TECLADO: Remapeo usando geode::KeyCode ─────────────────────────────
+    // ── TECLADO: Remapeo con Cast Numérico para Latencia Cero ────────────────
     geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         auto mod = Mod::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        // En Geode v5, el tipo correcto para bindeos es geode::KeyCode
-        auto key1 = mod->getSettingValue<geode::KeyCode>("jump-keybind");
-        auto key2 = mod->getSettingValue<geode::KeyCode>("jump-keybind-2");
+        // Obtenemos el bindeo como enumKeyCodes (tipo correcto en Geode v5)
+        auto key1 = mod->getSettingValue<enumKeyCodes>("jump-keybind");
+        auto key2 = mod->getSettingValue<enumKeyCodes>("jump-keybind-2");
 
-        // Comparamos directamente los KeyCodes
-        if (data.key == key1 || data.key == key2) {
+        // Convertimos ambos a int para comparación rápida
+        int pressedKey = static_cast<int>(data.key);
+        int target1 = static_cast<int>(key1);
+        int target2 = static_cast<int>(key2);
+
+        if (pressedKey == target1 || pressedKey == target2) {
             bool down = (data.action != geode::KeyboardInputData::Action::Release);
             
-            // Enviamos el salto (Space)
             kbd->dispatchKeyboardMSG(
                 enumKeyCodes::KEY_Space, 
                 down, 
@@ -26,14 +28,13 @@ $execute {
                 data.timestamp
             );
 
-            // Bloqueamos la tecla original para evitar conflictos
             return ListenerResult::Stop;
         }
 
         return ListenerResult::Propagate;
     }).leak();
 
-    // ── MOUSE: Click Derecho (Z) y Click de Rueda (X) ──────────────────────
+    // ── MOUSE: Remapeo funcional para Práctica ─────────────────────────────
     geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd || !Mod::get()->getSettingValue<bool>("rapid-checkpoints")) return ListenerResult::Propagate;
