@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
+#include <Geode/modify/CCEGLView.hpp>
 
 using namespace geode::prelude;
 
@@ -19,7 +20,6 @@ namespace {
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
 
-        // ListenerHandle* en lugar de optional<ListenerHandle>
         geode::comm::ListenerHandle* j1SettingHandle = nullptr;
         geode::comm::ListenerHandle* j2SettingHandle = nullptr;
         geode::comm::ListenerHandle* rcSettingHandle = nullptr;
@@ -95,9 +95,20 @@ class $modify(CCKeyboardDispatcher) {
             }
         }
 
-        // ── Fuera de nivel o en pausa: reset del contador y propagación ───
-        if (!pl || pl->m_isPaused) {
+        // ── Fuera de nivel: reset y propagación normal ────────────────────
+        if (!pl) {
             s.jumpKeysHeld = 0;
+            return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
+        }
+
+        // ── En pausa: remapeo sin trackear contador ───────────────────────
+        // Permite input anticipado al despausar (la tecla llega como Space a GD)
+        if (pl->m_isPaused) {
+            s.jumpKeysHeld = 0;
+            bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
+            bool isJ2 = s.jump2Enabled && s.jump2Key != enumKeyCodes::KEY_Unknown && key == s.jump2Key;
+            if ((isJ1 || isJ2) && key != JUMP_KEY)
+                return CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, down, isRepeat, timestamp);
             return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
         }
 
@@ -130,20 +141,40 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
-// ── Hook de mouse ─────────────────────────────────────────────────────────
-// CCMouseDispatcher solo expone dispatchScrollMSG en GD 2.2081
-// Los botones del mouse llegan como keycodes especiales por CCKeyboardDispatcher
-// Mouse1 = KEY_MouseLeft, Mouse2 = KEY_MouseRight, Mouse3 = KEY_MouseMiddle
-class $modify(CCKeyboardDispatcher) {
-    // Ya hookeado arriba — extendemos la lógica dentro del mismo hook
+// ── Hook de mouse via CCEGLView ───────────────────────────────────────────
+// Click derecho y rueda no pasan por CCKeyboardDispatcher en GD,
+// se interceptan en CCEGLView antes de que el motor los procese
+class $modify(CCEGLView) {
+    void onGLFWMouseCallBack(GLFWwindow* window, int button, int action, int mods) {
+        if (!s.rapidCheckpoints) {
+            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+            return;
+        }
+
+        auto* pl = PlayLayer::get();
+        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused) {
+            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+            return;
+        }
+
+        bool down = (action == GLFW_PRESS);
+
+        // GLFW_MOUSE_BUTTON_RIGHT = 1, GLFW_MOUSE_BUTTON_MIDDLE = 2
+        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            if (down) pl->markCheckpoint();
+            return; // Consumimos el evento
+        }
+
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+            if (down) pl->removeLastCheckpoint();
+            return; // Consumimos el evento
+        }
+
+        CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+    }
 };
 
-// Necesitamos un segundo bloque separado para el mouse via keycodes
-// GD despacha botones del mouse como enumKeyCodes en el mismo dispatcher
-// KEY_MouseLeft = click izquierdo, KEY_MouseRight = click derecho, KEY_MouseMiddle = rueda
-// Esto se maneja dentro del hook de CCKeyboardDispatcher existente agregando:
-// (ver lógica integrada abajo en $on_mod)
-
+// ── Entry point ───────────────────────────────────────────────────────────
 $on_mod(Loaded) {
     auto* mod = Mod::get();
 
