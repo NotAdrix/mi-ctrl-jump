@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
+#include <Geode/loader/Event.hpp>
 
 using namespace geode::prelude;
 
@@ -25,7 +26,7 @@ namespace {
         geode::comm::ListenerHandle* rcSettingHandle = nullptr;
 
         // Volvemos a tu idea original: el event listener de Geode
-        EventListener<geode::MouseInputEvent> mouseListener;
+        geode::EventListener<geode::MouseInputEvent> mouseListener;
     } s;
 }
 
