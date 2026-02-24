@@ -27,7 +27,7 @@
         "rapid-checkpoints": {
             "type": "bool",
             "default": true,
-            "name": "Rapid Checkpoints (Mouse)"
+            "name": "Rapid Checkpoints (Mouse)",
             "description": "Click derecho = z, Boton de la Rueda = x"
         }
     }
