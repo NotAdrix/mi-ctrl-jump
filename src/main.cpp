@@ -1,6 +1,8 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCEGLView.hpp>
+
+// GLFW está disponible en Windows a través del SDK de Cocos2d incluido en Geode
+#include <Geode/cocos/robtop/glfw/glfw3.h>
 
 using namespace geode::prelude;
 
@@ -19,6 +21,9 @@ namespace {
         bool rapidCheckpoints   = false;
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
+
+        // Guardamos el callback original de GLFW para encadenarlo
+        GLFWmousebuttonfun originalMouseCallback = nullptr;
     } s;
 }
 
@@ -66,6 +71,34 @@ static bool tryBindKey(enumKeyCodes key) {
         FLAlertLayer::create("Éxito", "¡Tecla vinculada correctamente!", "OK")->show();
     });
     return true;
+}
+
+// ── Callback de mouse registrado directamente en GLFW ─────────────────────
+static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    bool handled = false;
+
+    if (s.rapidCheckpoints) {
+        auto* pl = PlayLayer::get();
+        if (pl && pl->m_isPracticeMode && !pl->m_isPaused) {
+            auto* kbd = CCKeyboardDispatcher::get();
+            if (kbd) {
+                bool down = (action == GLFW_PRESS);
+
+                if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                    kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
+                    handled = true;
+                } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                    kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
+                    handled = true;
+                }
+            }
+        }
+    }
+
+    // Si no lo manejamos nosotros, propagamos al callback original de Cocos
+    if (!handled && s.originalMouseCallback) {
+        s.originalMouseCallback(window, button, action, mods);
+    }
 }
 
 // ── Hook de teclado ───────────────────────────────────────────────────────
@@ -134,44 +167,6 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
-// ── Hook de mouse (reemplaza el EventListener eliminado) ──────────────────
-class $modify(CCEGLView) {
-    void onGLFWMouseCallBack(GLFWwindow* window, int button, int action, int mods) {
-        if (!s.rapidCheckpoints) {
-            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-            return;
-        }
-
-        auto* pl = PlayLayer::get();
-        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused) {
-            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-            return;
-        }
-
-        auto* kbd = CCKeyboardDispatcher::get();
-        if (!kbd) {
-            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-            return;
-        }
-
-        bool down = (action == GLFW_PRESS);
-
-        // Botón derecho → tecla Z (colocar checkpoint)
-        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return; // No propagar el clic original
-        }
-
-        // Botón medio → tecla X (borrar checkpoint)
-        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return; // No propagar el clic original
-        }
-
-        CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-    }
-};
-
 // ── Entry point ───────────────────────────────────────────────────────────
 $on_mod(Loaded) {
     auto* mod = Mod::get();
@@ -217,4 +212,15 @@ $on_mod(Loaded) {
     listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
         s.rapidCheckpoints = enabled;
     });
+
+    // ── Registrar callback de mouse directo en GLFW ───────────────────────
+    // Geode corre en el main thread, CCEGLView ya está inicializado en este punto.
+    // Obtenemos la ventana GLFW y reemplazamos el callback guardando el original.
+    auto* view = CCEGLView::sharedOpenGLView();
+    if (view) {
+        GLFWwindow* window = view->getWindow();
+        if (window) {
+            s.originalMouseCallback = glfwSetMouseButtonCallback(window, mouseButtonCallback);
+        }
+    }
 }
