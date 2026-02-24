@@ -1,7 +1,11 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCEGLView.hpp>
-#include <Geode/cocos/robtop/glfw/glfw3.h>
+#include <Geode/modify/PlayLayer.hpp>
+
+// Usamos la API de Windows para el ratón (Infalible y bypass a Cocos2d-x)
+#ifdef GEODE_IS_WINDOWS
+#include <Windows.h>
+#endif
 
 using namespace geode::prelude;
 
@@ -20,6 +24,10 @@ namespace {
         bool rapidCheckpoints   = false;
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
+
+        geode::comm::ListenerHandle* j1SettingHandle = nullptr;
+        geode::comm::ListenerHandle* j2SettingHandle = nullptr;
+        geode::comm::ListenerHandle* rcSettingHandle = nullptr;
     } s;
 }
 
@@ -62,37 +70,12 @@ static bool tryBindKey(enumKeyCodes key) {
     }
 
     s.bindingSlot = BindingSlot::None;
+
     Loader::get()->queueInMainThread([] {
         FLAlertLayer::create("Éxito", "¡Tecla vinculada correctamente!", "OK")->show();
     });
     return true;
 }
-
-// ── Hook de mouse via Geode (cross-platform, sin GLFW directo) ────────────
-class $modify(CCEGLView) {
-    void onGLFWMouseCallBack(GLFWwindow* window, int button, int action, int mods) {
-        if (s.rapidCheckpoints) {
-            auto* pl = PlayLayer::get();
-            if (pl && pl->m_isPracticeMode && !pl->m_isPaused) {
-                auto* kbd = CCKeyboardDispatcher::get();
-                if (kbd) {
-                    bool down = (action == GLFW_PRESS);
-
-                    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                        kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-                        return;
-                    }
-                    if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
-                        kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-                        return;
-                    }
-                }
-            }
-        }
-
-        CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-    }
-};
 
 // ── Hook de teclado ───────────────────────────────────────────────────────
 class $modify(CCKeyboardDispatcher) {
@@ -112,30 +95,17 @@ class $modify(CCKeyboardDispatcher) {
             }
         }
 
-        // ── Fuera de nivel ────────────────────────────────────────────────
-        if (!pl) {
+        // ── LIMPIEZA DEL FIX FANTASMA ─────────────────────────────────────
+        // Si no estamos en nivel o estamos en pausa, simplemente reseteamos
+        // el contador interno y dejamos que el juego actúe normalmente (Vanilla)
+        if (!pl || pl->m_isPaused) {
             s.jumpKeysHeld = 0;
-            return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
-        }
-
-        // ── En pausa ──────────────────────────────────────────────────────
-        if (pl->m_isPaused) {
-            s.jumpKeysHeld = 0;
-            bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
-            bool isJ2 = s.jump2Enabled && s.jump2Key != enumKeyCodes::KEY_Unknown && key == s.jump2Key;
-            if ((isJ1 || isJ2) && key != JUMP_KEY)
-                return CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, down, isRepeat, timestamp);
             return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
         }
 
         // ── Modo juego ────────────────────────────────────────────────────
-        bool isJ1 = s.jump1Enabled
-                 && s.jump1Key != enumKeyCodes::KEY_Unknown
-                 && key == s.jump1Key;
-
-        bool isJ2 = s.jump2Enabled
-                 && s.jump2Key != enumKeyCodes::KEY_Unknown
-                 && key == s.jump2Key;
+        bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
+        bool isJ2 = s.jump2Enabled && s.jump2Key != enumKeyCodes::KEY_Unknown && key == s.jump2Key;
 
         if ((isJ1 || isJ2) && key != JUMP_KEY) {
             if (down && !isRepeat) {
@@ -157,6 +127,43 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
+// ── Hook Infalible para el Mouse ──────────────────────────────────────────
+#ifdef GEODE_IS_WINDOWS
+class $modify(PlayLayer) {
+    struct Fields {
+        bool rightDown = false;
+        bool middleDown = false;
+    };
+
+    void update(float dt) {
+        PlayLayer::update(dt);
+
+        if (!s.rapidCheckpoints || !m_isPracticeMode || m_isPaused) return;
+
+        auto* kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return;
+
+        // Click Derecho -> Dispara Z
+        bool rightNow = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+        if (rightNow && !m_fields->rightDown) {
+            // Mandamos apretar y soltar Z instantáneamente
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, true, false, 0.0);
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, false, false, 0.0);
+        }
+        m_fields->rightDown = rightNow;
+
+        // Botón de la rueda -> Dispara X
+        bool middleNow = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+        if (middleNow && !m_fields->middleDown) {
+            // Mandamos apretar y soltar X instantáneamente
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true, false, 0.0);
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
+        }
+        m_fields->middleDown = middleNow;
+    }
+};
+#endif
+
 // ── Entry point ───────────────────────────────────────────────────────────
 $on_mod(Loaded) {
     auto* mod = Mod::get();
@@ -170,35 +177,25 @@ $on_mod(Loaded) {
     s.jump1Key = raw1 ? static_cast<enumKeyCodes>(raw1) : enumKeyCodes::KEY_Unknown;
     s.jump2Key = raw2 ? static_cast<enumKeyCodes>(raw2) : enumKeyCodes::KEY_Unknown;
 
-    listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
-        s.jump1Enabled = enabled;
-        if (enabled) {
-            s.bindingSlot = BindingSlot::Jump1;
-            geode::Notification::create(
-                "Presiona una tecla para vincular (ESC cancela)",
-                geode::NotificationIcon::Info
-            )->show();
-        } else {
-            cancelBinding();
-            clearKey(BindingSlot::Jump1);
-        }
-    });
+    auto setupJumpSetting = [](std::string setting, BindingSlot slot, bool& enabledState) {
+        return listenForSettingChanges<bool>(setting, [=, &enabledState](bool enabled) {
+            enabledState = enabled;
+            if (enabled) {
+                s.bindingSlot = slot;
+                geode::Notification::create(
+                    "Presiona una tecla para vincular (ESC cancela)",
+                    geode::NotificationIcon::Info
+                )->show();
+            } else {
+                cancelBinding();
+                clearKey(slot);
+            }
+        });
+    };
 
-    listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
-        s.jump2Enabled = enabled;
-        if (enabled) {
-            s.bindingSlot = BindingSlot::Jump2;
-            geode::Notification::create(
-                "Presiona una tecla para vincular (ESC cancela)",
-                geode::NotificationIcon::Info
-            )->show();
-        } else {
-            cancelBinding();
-            clearKey(BindingSlot::Jump2);
-        }
-    });
-
-    listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
+    s.j1SettingHandle = setupJumpSetting("enable-jump-1", BindingSlot::Jump1, s.jump1Enabled);
+    s.j2SettingHandle = setupJumpSetting("enable-jump-2", BindingSlot::Jump2, s.jump2Enabled);
+    s.rcSettingHandle = listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
         s.rapidCheckpoints = enabled;
     });
 }
