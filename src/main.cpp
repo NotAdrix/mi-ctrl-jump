@@ -1,10 +1,54 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-
-// GLFW está disponible en Windows a través del SDK de Cocos2d incluido en Geode
 #include <Geode/cocos/robtop/glfw/glfw3.h>
 
+// Resolución dinámica cross-platform
+#ifdef GEODE_IS_WINDOWS
+  #include <Windows.h>
+#else
+  #include <dlfcn.h>
+#endif
+
 using namespace geode::prelude;
+
+// Puntero a la función resuelta en runtime
+using PFN_glfwSetMouseButtonCallback =
+    GLFWmousebuttonfun(*)(GLFWwindow*, GLFWmousebuttonfun);
+
+static PFN_glfwSetMouseButtonCallback s_glfwSetMouseButtonCallback = nullptr;
+
+static bool resolveGLFW() {
+#ifdef GEODE_IS_WINDOWS
+    // Buscamos en todos los módulos cargados; GD embebe GLFW en libcocos2d.dll
+    static const char* candidates[] = {
+        "libcocos2d.dll",
+        "GeometryDash.exe",  // a veces está en el ejecutable principal
+        nullptr
+    };
+    for (int i = 0; candidates[i]; ++i) {
+        HMODULE h = GetModuleHandleA(candidates[i]);
+        if (!h) continue;
+        auto fn = reinterpret_cast<PFN_glfwSetMouseButtonCallback>(
+            GetProcAddress(h, "glfwSetMouseButtonCallback")
+        );
+        if (fn) { s_glfwSetMouseButtonCallback = fn; return true; }
+    }
+    // Último recurso: buscar en el espacio de proceso completo
+    // (no hay equivalente directo, así que logueamos el fallo)
+    log::error("glfwSetMouseButtonCallback no encontrada en ningún módulo Windows");
+    return false;
+#else
+    // Linux / Mac: RTLD_DEFAULT busca en todo el proceso
+    auto fn = reinterpret_cast<PFN_glfwSetMouseButtonCallback>(
+        dlsym(RTLD_DEFAULT, "glfwSetMouseButtonCallback")
+    );
+    if (fn) { s_glfwSetMouseButtonCallback = fn; return true; }
+    log::error("glfwSetMouseButtonCallback no encontrada: {}", dlerror());
+    return false;
+#endif
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr enumKeyCodes JUMP_KEY    = enumKeyCodes::KEY_Space;
 static constexpr const char* SAVE_KEY_J1 = "jump1-key-id";
@@ -21,8 +65,6 @@ namespace {
         bool rapidCheckpoints   = false;
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
-
-        // Guardamos el callback original de GLFW para encadenarlo
         GLFWmousebuttonfun originalMouseCallback = nullptr;
     } s;
 }
@@ -66,14 +108,13 @@ static bool tryBindKey(enumKeyCodes key) {
     }
 
     s.bindingSlot = BindingSlot::None;
-
     Loader::get()->queueInMainThread([] {
         FLAlertLayer::create("Éxito", "¡Tecla vinculada correctamente!", "OK")->show();
     });
     return true;
 }
 
-// ── Callback de mouse registrado directamente en GLFW ─────────────────────
+// ── Callback de mouse ─────────────────────────────────────────────────────
 static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     bool handled = false;
 
@@ -83,7 +124,6 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
             auto* kbd = CCKeyboardDispatcher::get();
             if (kbd) {
                 bool down = (action == GLFW_PRESS);
-
                 if (button == GLFW_MOUSE_BUTTON_RIGHT) {
                     kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
                     handled = true;
@@ -95,10 +135,8 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
         }
     }
 
-    // Si no lo manejamos nosotros, propagamos al callback original de Cocos
-    if (!handled && s.originalMouseCallback) {
+    if (!handled && s.originalMouseCallback)
         s.originalMouseCallback(window, button, action, mods);
-    }
 }
 
 // ── Hook de teclado ───────────────────────────────────────────────────────
@@ -106,29 +144,23 @@ class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double timestamp) {
         auto* pl = PlayLayer::get();
 
-        // ── Modo binding ──────────────────────────────────────────────────
         if (s.bindingSlot != BindingSlot::None) {
             if (pl) {
                 cancelBinding();
             } else {
                 if (down && !isRepeat) {
-                    if (key == enumKeyCodes::KEY_Escape) {
-                        cancelBinding();
-                    } else {
-                        tryBindKey(key);
-                    }
+                    if (key == enumKeyCodes::KEY_Escape) cancelBinding();
+                    else tryBindKey(key);
                 }
                 return true;
             }
         }
 
-        // ── Fuera de nivel: reset y propagación normal ────────────────────
         if (!pl) {
             s.jumpKeysHeld = 0;
             return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
         }
 
-        // ── En pausa: remapeo sin trackear contador ───────────────────────
         if (pl->m_isPaused) {
             s.jumpKeysHeld = 0;
             bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
@@ -138,14 +170,8 @@ class $modify(CCKeyboardDispatcher) {
             return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
         }
 
-        // ── Modo juego ────────────────────────────────────────────────────
-        bool isJ1 = s.jump1Enabled
-                 && s.jump1Key != enumKeyCodes::KEY_Unknown
-                 && key == s.jump1Key;
-
-        bool isJ2 = s.jump2Enabled
-                 && s.jump2Key != enumKeyCodes::KEY_Unknown
-                 && key == s.jump2Key;
+        bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
+        bool isJ2 = s.jump2Enabled && s.jump2Key != enumKeyCodes::KEY_Unknown && key == s.jump2Key;
 
         if ((isJ1 || isJ2) && key != JUMP_KEY) {
             if (down && !isRepeat) {
@@ -180,47 +206,34 @@ $on_mod(Loaded) {
     s.jump1Key = raw1 ? static_cast<enumKeyCodes>(raw1) : enumKeyCodes::KEY_Unknown;
     s.jump2Key = raw2 ? static_cast<enumKeyCodes>(raw2) : enumKeyCodes::KEY_Unknown;
 
-    // Registro de settings
     listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
         s.jump1Enabled = enabled;
         if (enabled) {
             s.bindingSlot = BindingSlot::Jump1;
-            geode::Notification::create(
-                "Presiona una tecla para vincular (ESC cancela)",
-                geode::NotificationIcon::Info
-            )->show();
-        } else {
-            cancelBinding();
-            clearKey(BindingSlot::Jump1);
-        }
+            geode::Notification::create("Presiona una tecla para vincular (ESC cancela)", geode::NotificationIcon::Info)->show();
+        } else { cancelBinding(); clearKey(BindingSlot::Jump1); }
     });
 
     listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
         s.jump2Enabled = enabled;
         if (enabled) {
             s.bindingSlot = BindingSlot::Jump2;
-            geode::Notification::create(
-                "Presiona una tecla para vincular (ESC cancela)",
-                geode::NotificationIcon::Info
-            )->show();
-        } else {
-            cancelBinding();
-            clearKey(BindingSlot::Jump2);
-        }
+            geode::Notification::create("Presiona una tecla para vincular (ESC cancela)", geode::NotificationIcon::Info)->show();
+        } else { cancelBinding(); clearKey(BindingSlot::Jump2); }
     });
 
     listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
         s.rapidCheckpoints = enabled;
     });
 
-    // ── Registrar callback de mouse directo en GLFW ───────────────────────
-    // Geode corre en el main thread, CCEGLView ya está inicializado en este punto.
-    // Obtenemos la ventana GLFW y reemplazamos el callback guardando el original.
-    auto* view = CCEGLView::sharedOpenGLView();
-    if (view) {
-        GLFWwindow* window = view->getWindow();
-        if (window) {
-            s.originalMouseCallback = glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    // ── Registrar callback de mouse via resolución dinámica ───────────────
+    if (resolveGLFW()) {
+        auto* view = CCEGLView::sharedOpenGLView();
+        if (view) {
+            GLFWwindow* window = view->getWindow();
+            if (window) {
+                s.originalMouseCallback = s_glfwSetMouseButtonCallback(window, mouseButtonCallback);
+            }
         }
     }
 }
