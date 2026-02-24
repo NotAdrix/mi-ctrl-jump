@@ -10,24 +10,19 @@
     "developer": "notadrix",
     "description": "Remapeo dinámico a Space, Click Derecho a Z, Ruedita a X.",
     "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
-    "tags": [
-        "gameplay",
-        "utility"
-    ],
+    "tags": ["gameplay", "utility"],
     "settings": {
-        "jump1-key-id": { "type": "int", "default": 0, "hidden": true },
-        "jump2-key-id": { "type": "int", "default": 0, "hidden": true },
-        "binding-mode-1": {
+        "enable-jump-1": {
             "type": "bool",
             "default": false,
-            "name": "Vincular Salto 1",
-            "description": "1. Activa la casilla.\n2. Toca la tecla que quieres usar.\n(Toca ESC para cancelar)"
+            "name": "Activar Salto 1",
+            "description": "Marca la casilla y presiona APPLY para elegir tu tecla."
         },
-        "binding-mode-2": {
+        "enable-jump-2": {
             "type": "bool",
             "default": false,
-            "name": "Vincular Salto 2",
-            "description": "1. Activa la casilla.\n2. Toca la tecla que quieres usar.\n(Toca ESC para cancelar)"
+            "name": "Activar Salto 2",
+            "description": "Marca la casilla y presiona APPLY para elegir tu tecla."
         },
         "rapid-checkpoints": {
             "type": "bool",
