@@ -1,17 +1,31 @@
 {
-    "geode": "3.0.0-beta.1",
-    "id": "tu.nombre.mod",
-    "version": "1.0.0",
-    "name": "Custom Remapper",
-    "developer": "TuNombre",
-    "description": "Remapea modificadores a Salto y activa Checkpoints rápidos.",
+    "geode": "5.0.0",
+    "gd": {
+        "win": "2.2081",
+        "android": "2.2074"
+    },
+    "id": "notadrix.mi_ctrl_jump",
+    "version": "v1.0.0",
+    "name": "Mi Ctrl Jump",
+    "developer": "notadrix",
+    "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita -> X.",
+    "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
+    "tags": [
+        "gameplay",
+        "utility"
+    ],
     "settings": {
-        "l-ctrl": { "name": "Left Control", "type": "bool", "default": true },
-        "r-ctrl": { "name": "Right Control", "type": "bool", "default": false },
-        "l-shift": { "name": "Left Shift", "type": "bool", "default": false },
-        "r-shift": { "name": "Right Shift", "type": "bool", "default": false },
-        "l-alt": { "name": "Left Alt", "type": "bool", "default": false },
-        "r-alt": { "name": "Right Alt", "type": "bool", "default": false },
-        "rapid-checkpoints": { "name": "Enable rapidcheckpoints with mouse", "type": "bool", "default": true }
+        "jump1-key-id": {
+            "type": "int",
+            "default": 0,
+            "name": "ID Salto 1",
+            "hidden": true
+        },
+        "jump2-key-id": {
+            "type": "int",
+            "default": 0,
+            "name": "ID Salto 2",
+            "hidden": true
+        }
     }
-}
+} 
