@@ -59,12 +59,12 @@ $execute {
                 if (g_isBindingJump1 && currentKey != j2) {
                     mod->setSavedValue("jump1-key-id", static_cast<int64_t>(currentKey));
                     g_isBindingJump1 = false;
-                    FLAlertLayer::create("Exito", "¡Tecla 1 vinculada con exito!\n\n", "OK")->show();
+                    FLAlertLayer::create("Exito", "¡Tecla 1 vinculada con exito!", "OK")->show();
                 } 
                 else if (g_isBindingJump2 && currentKey != j1) {
                     mod->setSavedValue("jump2-key-id", static_cast<int64_t>(currentKey));
                     g_isBindingJump2 = false;
-                    FLAlertLayer::create("Exito", "¡Tecla 2 vinculada con exito!\n\n", "OK")->show();
+                    FLAlertLayer::create("Exito", "¡Tecla 2 vinculada con exito!", "OK")->show();
                 }
             }
             return ListenerResult::Stop; 
