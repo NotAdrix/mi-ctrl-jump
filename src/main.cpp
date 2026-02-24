@@ -4,6 +4,7 @@
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 
 using namespace geode::prelude;
+
 // Variables globales para controlar el estado de vinculación
 bool g_isBindingJump1 = false;
 bool g_isBindingJump2 = false;
@@ -17,14 +18,12 @@ $execute {
 
         int currentKey = static_cast<int>(data.key);
         
-        // --- PASO 3 y 4: Lógica de Vinculación (Settings) ---
+        // --- Lógica de Vinculación (Modo Escucha) ---
         if (g_isBindingJump1 || g_isBindingJump2) {
-            // Solo vinculamos cuando el usuario presiona la tecla (no cuando la suelta)
             if (data.action == geode::KeyboardInputData::Action::Press) {
                 int64_t j1 = mod->getSettingValue<int64_t>("jump1-key-id");
                 int64_t j2 = mod->getSettingValue<int64_t>("jump2-key-id");
 
-                // Validación de duplicados
                 if (g_isBindingJump1 && currentKey != j2) {
                     mod->setSettingValue("jump1-key-id", static_cast<int64_t>(currentKey));
                     g_isBindingJump1 = false;
@@ -36,55 +35,40 @@ $execute {
                     FLAlertLayer::create("Éxito", "Tecla 2 vinculada", "OK")->show();
                 }
             }
-            return ListenerResult::Stop; // Detenemos todo mientras vinculamos
+            return ListenerResult::Stop; 
         }
 
-        // --- PASO 5: Re-mapeo dinámico ---
+        // --- Re-mapeo Dinámico al Espacio ---
         int64_t jump1Key = mod->getSettingValue<int64_t>("jump1-key-id");
         int64_t jump2Key = mod->getSettingValue<int64_t>("jump2-key-id");
 
         if (currentKey != 0 && (currentKey == jump1Key || currentKey == jump2Key)) {
-            // Calculamos si está presionado o soltado
             bool down = (data.action != geode::KeyboardInputData::Action::Release);
             bool isRepeat = (data.action == geode::KeyboardInputData::Action::Repeat);
 
-            // PASO 6: El "Engaño" al motor - Enviamos SPACE
             kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, isRepeat, data.timestamp);
-            
-            return ListenerResult::Stop; // La tecla original deja de existir
+            return ListenerResult::Stop; 
         }
 
         return ListenerResult::Propagate;
     }).leak();
 
-    // ── MOUSE Y boton de la rueda (Rapid Checkpoints) ──────────────────────────────────
-    geode::MouseInputEvent().listen([forceSync](geode::MouseInputData& data) {
+    // ── MOUSE (Rapid Checkpoints: Clic Derecho y Clic Rueda) ───────────────
+    geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        forceSync(data.modifiers, data.timestamp);
-
-        // Solo actuamos si la configuración de Rapid Checkpoints está encendida
         if (Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
             bool down = (data.action == geode::MouseInputData::Action::Press);
+            
+            // Clic Derecho -> Z
             if (data.button == geode::MouseInputData::Button::Right) {
                 kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, data.timestamp);
                 return ListenerResult::Stop;
             }
+            // Clic de la Rueda (Middle Click) -> X
             if (data.button == geode::MouseInputData::Button::Middle) {
                 kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, data.timestamp);
-                return ListenerResult::Stop;
-            }
-        }
-        return ListenerResult::Propagate;
-    }).leak();
-
-    geode::ScrollWheelEvent().listen(+[](double x, double y) {
-        if (Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
-            auto kbd = CCKeyboardDispatcher::get();
-            if (kbd) {
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true,  false, 0.0);
-                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
                 return ListenerResult::Stop;
             }
         }
