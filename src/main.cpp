@@ -10,7 +10,7 @@ bool g_isBindingJump2 = false;
 
 $execute {
     // --- 1. ESCUCHADORES (Se activan al poner el primer APPLY) ---
-    listenForSettingChanges("enable-jump-1", +[](bool enabled) {
+    listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
         if (enabled) {
             g_isBindingJump1 = true;
             FLAlertLayer::create("Modo Escucha", "Presiona la tecla que quieres usar para el Salto 1.\n\nPresiona [ESC] para cancelar.", "OK")->show();
@@ -21,7 +21,7 @@ $execute {
         }
     });
 
-    listenForSettingChanges("enable-jump-2", +[](bool enabled) {
+    listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
         if (enabled) {
             g_isBindingJump2 = true;
             FLAlertLayer::create("Modo Escucha", "Presiona la tecla que quieres usar para el Salto 2.\n\nPresiona [ESC] para cancelar.", "OK")->show();
