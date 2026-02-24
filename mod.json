@@ -16,18 +16,19 @@
             "type": "bool",
             "default": false,
             "name": "Activar Salto 1",
-            "description": "Marca la casilla y presiona APPLY para elegir tu tecla."
+            "description": "Remapeo del Salto a la tecla personalizada"
         },
         "enable-jump-2": {
             "type": "bool",
             "default": false,
             "name": "Activar Salto 2",
-            "description": "Marca la casilla y presiona APPLY para elegir tu tecla."
+            "description": "Salto Alternativo de J1"
         },
         "rapid-checkpoints": {
             "type": "bool",
             "default": true,
             "name": "Rapid Checkpoints (Mouse)"
+            "description": "Click derecho = z, Boton de la Rueda = x"
         }
     }
 }
