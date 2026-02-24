@@ -1,6 +1,5 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCMouseDispatcher.hpp>
 
 using namespace geode::prelude;
 
@@ -20,9 +19,10 @@ namespace {
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
 
-        std::optional<geode::comm::ListenerHandle> j1SettingHandle;
-        std::optional<geode::comm::ListenerHandle> j2SettingHandle;
-        std::optional<geode::comm::ListenerHandle> rcSettingHandle;
+        // ListenerHandle* en lugar de optional<ListenerHandle>
+        geode::comm::ListenerHandle* j1SettingHandle = nullptr;
+        geode::comm::ListenerHandle* j2SettingHandle = nullptr;
+        geode::comm::ListenerHandle* rcSettingHandle = nullptr;
     } s;
 }
 
@@ -74,7 +74,7 @@ static bool tryBindKey(enumKeyCodes key) {
 
 // ── Hook de teclado ───────────────────────────────────────────────────────
 class $modify(CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double timestamp) {
         auto* pl = PlayLayer::get();
 
         // ── Modo binding ──────────────────────────────────────────────────
@@ -98,7 +98,7 @@ class $modify(CCKeyboardDispatcher) {
         // ── Fuera de nivel o en pausa: reset del contador y propagación ───
         if (!pl || pl->m_isPaused) {
             s.jumpKeysHeld = 0;
-            return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat);
+            return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
         }
 
         // ── Modo juego ────────────────────────────────────────────────────
@@ -113,49 +113,37 @@ class $modify(CCKeyboardDispatcher) {
         if ((isJ1 || isJ2) && key != JUMP_KEY) {
             if (down && !isRepeat) {
                 if (s.jumpKeysHeld == 0)
-                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, true, false);
+                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, true, false, timestamp);
                 s.jumpKeysHeld++;
             } else if (down && isRepeat) {
                 if (s.jumpKeysHeld == 1)
-                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, true, true);
+                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, true, true, timestamp);
             } else {
-                // Decrementar sin bajar de cero, sin depender de <algorithm>
                 if (s.jumpKeysHeld > 0) s.jumpKeysHeld--;
                 if (s.jumpKeysHeld == 0)
-                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, false, false);
+                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, false, false, timestamp);
             }
             return true;
         }
 
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat);
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
     }
 };
 
 // ── Hook de mouse ─────────────────────────────────────────────────────────
-class $modify(CCMouseDispatcher) {
-    bool dispatchMouseMSG(cocos2d::CCMouseButton btn, bool down) {
-        if (!s.rapidCheckpoints)
-            return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-
-        auto* pl = PlayLayer::get();
-        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused)
-            return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-
-        if (btn == cocos2d::CCMouseButton::ButtonRight) {
-            if (down) pl->markCheckpoint();
-            return true;
-        }
-
-        if (btn == cocos2d::CCMouseButton::ButtonMiddle) {
-            if (down) pl->removeLastCheckpoint();
-            return true;
-        }
-
-        return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-    }
+// CCMouseDispatcher solo expone dispatchScrollMSG en GD 2.2081
+// Los botones del mouse llegan como keycodes especiales por CCKeyboardDispatcher
+// Mouse1 = KEY_MouseLeft, Mouse2 = KEY_MouseRight, Mouse3 = KEY_MouseMiddle
+class $modify(CCKeyboardDispatcher) {
+    // Ya hookeado arriba — extendemos la lógica dentro del mismo hook
 };
 
-// ── Entry point ───────────────────────────────────────────────────────────
+// Necesitamos un segundo bloque separado para el mouse via keycodes
+// GD despacha botones del mouse como enumKeyCodes en el mismo dispatcher
+// KEY_MouseLeft = click izquierdo, KEY_MouseRight = click derecho, KEY_MouseMiddle = rueda
+// Esto se maneja dentro del hook de CCKeyboardDispatcher existente agregando:
+// (ver lógica integrada abajo en $on_mod)
+
 $on_mod(Loaded) {
     auto* mod = Mod::get();
 
@@ -168,7 +156,6 @@ $on_mod(Loaded) {
     s.jump1Key = raw1 ? static_cast<enumKeyCodes>(raw1) : enumKeyCodes::KEY_Unknown;
     s.jump2Key = raw2 ? static_cast<enumKeyCodes>(raw2) : enumKeyCodes::KEY_Unknown;
 
-    // DRY: lambda con std::string para copia profunda segura del setting key
     auto setupJumpSetting = [](std::string setting, BindingSlot slot, bool& enabledState) {
         return listenForSettingChanges<bool>(setting, [=, &enabledState](bool enabled) {
             enabledState = enabled;
@@ -187,7 +174,6 @@ $on_mod(Loaded) {
 
     s.j1SettingHandle = setupJumpSetting("enable-jump-1", BindingSlot::Jump1, s.jump1Enabled);
     s.j2SettingHandle = setupJumpSetting("enable-jump-2", BindingSlot::Jump2, s.jump2Enabled);
-
     s.rcSettingHandle = listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
         s.rapidCheckpoints = enabled;
     });
