@@ -1,8 +1,12 @@
 #include <Geode/Geode.hpp>
 #include <Geode/utils/Keyboard.hpp>
 #include <Geode/loader/Event.hpp>
+#include <Geode/modify/CCKeyboardDispatcher.hpp>
 
 using namespace geode::prelude;
+// Variables globales para controlar el estado de vinculación
+bool g_isBindingJump1 = false;
+bool g_isBindingJump2 = false;
 
 $execute {
     static bool modIsActive = false;
@@ -34,30 +38,50 @@ $execute {
     };
 
     // ── TECLADO DINÁMICO ────────────────────────────────────────────────────
-    geode::KeyboardInputEvent().listen([forceSync](geode::KeyboardInputData& data) {
+    geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         auto mod = Mod::get();
         if (!kbd) return ListenerResult::Propagate;
 
-        int keyId = static_cast<int>(data.key);
-        bool shouldRemap = false;
+        int currentKey = static_cast<int>(data.key);
+        
+        // --- PASO 3 y 4: Lógica de Vinculación (Settings) ---
+        if (g_isBindingJump1 || g_isBindingJump2) {
+            // Solo vinculamos cuando el usuario presiona la tecla (no cuando la suelta)
+            if (data.action == geode::KeyboardInputData::Action::Press) {
+                int64_t j1 = mod->getSettingValue<int64_t>("jump1-key-id");
+                int64_t j2 = mod->getSettingValue<int64_t>("jump2-key-id");
 
-        // Validamos si la tecla presionada es una de las habilitadas
-        if (keyId == 162 && mod->getSettingValue<bool>("l-ctrl"))  shouldRemap = true; // L-Ctrl
-        if (keyId == 163 && mod->getSettingValue<bool>("r-ctrl"))  shouldRemap = true; // R-Ctrl
-        if (keyId == 160 && mod->getSettingValue<bool>("l-shift")) shouldRemap = true; // L-Shift
-        if (keyId == 161 && mod->getSettingValue<bool>("r-shift")) shouldRemap = true; // R-Shift
-        if (keyId == 164 && mod->getSettingValue<bool>("l-alt"))   shouldRemap = true; // L-Alt
-        if (keyId == 165 && mod->getSettingValue<bool>("r-alt"))   shouldRemap = true; // R-Alt
-
-        if (shouldRemap) {
-            bool down = (data.action != geode::KeyboardInputData::Action::Release);
-            modIsActive = down;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, (data.action == geode::KeyboardInputData::Action::Repeat), data.timestamp);
-            return ListenerResult::Stop;
+                // Validación de duplicados
+                if (g_isBindingJump1 && currentKey != j2) {
+                    mod->setSettingValue("jump1-key-id", static_cast<int64_t>(currentKey));
+                    g_isBindingJump1 = false;
+                    FLAlertLayer::create("Éxito", "Tecla 1 vinculada", "OK")->show();
+                } 
+                else if (g_isBindingJump2 && currentKey != j1) {
+                    mod->setSettingValue("jump2-key-id", static_cast<int64_t>(currentKey));
+                    g_isBindingJump2 = false;
+                    FLAlertLayer::create("Éxito", "Tecla 2 vinculada", "OK")->show();
+                }
+            }
+            return ListenerResult::Stop; // Detenemos todo mientras vinculamos
         }
 
-        forceSync(data.modifiers, data.timestamp);
+        // --- PASO 5: Re-mapeo dinámico ---
+        int64_t jump1Key = mod->getSettingValue<int64_t>("jump1-key-id");
+        int64_t jump2Key = mod->getSettingValue<int64_t>("jump2-key-id");
+
+        if (currentKey != 0 && (currentKey == jump1Key || currentKey == jump2Key)) {
+            // Calculamos si está presionado o soltado
+            bool down = (data.action != geode::KeyboardInputData::Action::Release);
+            bool isRepeat = (data.action == geode::KeyboardInputData::Action::Repeat);
+
+            // PASO 6: El "Engaño" al motor - Enviamos SPACE
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, isRepeat, data.timestamp);
+            
+            return ListenerResult::Stop; // La tecla original deja de existir
+        }
+
         return ListenerResult::Propagate;
     }).leak();
 
