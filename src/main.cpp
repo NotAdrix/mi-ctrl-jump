@@ -1,12 +1,12 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCEGLView.hpp>
+#include <Geode/modify/CCMouseDispatcher.hpp>
 
 using namespace geode::prelude;
 
 static constexpr enumKeyCodes JUMP_KEY    = enumKeyCodes::KEY_Space;
-static constexpr const char*  SAVE_KEY_J1 = "jump1-key-id";
-static constexpr const char*  SAVE_KEY_J2 = "jump2-key-id";
+static constexpr const char* SAVE_KEY_J1 = "jump1-key-id";
+static constexpr const char* SAVE_KEY_J2 = "jump2-key-id";
 
 enum class BindingSlot { None, Jump1, Jump2 };
 
@@ -20,9 +20,9 @@ namespace {
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
 
-        geode::comm::ListenerHandle* j1SettingHandle = nullptr;
-        geode::comm::ListenerHandle* j2SettingHandle = nullptr;
-        geode::comm::ListenerHandle* rcSettingHandle = nullptr;
+        std::optional<geode::comm::ListenerHandle> j1SettingHandle;
+        std::optional<geode::comm::ListenerHandle> j2SettingHandle;
+        std::optional<geode::comm::ListenerHandle> rcSettingHandle;
     } s;
 }
 
@@ -80,8 +80,6 @@ class $modify(CCKeyboardDispatcher) {
         // ── Modo binding ──────────────────────────────────────────────────
         if (s.bindingSlot != BindingSlot::None) {
             if (pl) {
-                // Fall-through intencional: cancela el binding Y deja pasar
-                // el input al juego para que el jugador no pierda el salto
                 cancelBinding();
             } else {
                 if (down && !isRepeat) {
@@ -102,7 +100,6 @@ class $modify(CCKeyboardDispatcher) {
         }
 
         // ── En pausa: remapeo sin trackear contador ───────────────────────
-        // Permite input anticipado al despausar (la tecla llega como Space a GD)
         if (pl->m_isPaused) {
             s.jumpKeysHeld = 0;
             bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
@@ -141,36 +138,31 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
-// ── Hook de mouse via CCEGLView ───────────────────────────────────────────
-// Click derecho y rueda no pasan por CCKeyboardDispatcher en GD,
-// se interceptan en CCEGLView antes de que el motor los procese
-class $modify(CCEGLView) {
-    void onGLFWMouseCallBack(GLFWwindow* window, int button, int action, int mods) {
-        if (!s.rapidCheckpoints) {
-            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-            return;
-        }
+// ── Hook de mouse (Solución directa con Z y X) ────────────────────────────
+class $modify(CCMouseDispatcher) {
+    bool dispatchMouseMSG(cocos2d::CCMouseButton btn, bool down) {
+        if (!s.rapidCheckpoints)
+            return CCMouseDispatcher::dispatchMouseMSG(btn, down);
 
         auto* pl = PlayLayer::get();
-        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused) {
-            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
-            return;
+        // Solo inyectar teclas si estamos en modo práctica y sin pausa
+        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused)
+            return CCMouseDispatcher::dispatchMouseMSG(btn, down);
+
+        auto* kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return CCMouseDispatcher::dispatchMouseMSG(btn, down);
+
+        if (btn == cocos2d::CCMouseButton::ButtonRight) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
+            return true;
         }
 
-        bool down = (action == GLFW_PRESS);
-
-        // GLFW_MOUSE_BUTTON_RIGHT = 1, GLFW_MOUSE_BUTTON_MIDDLE = 2
-        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-            if (down) pl->markCheckpoint();
-            return; // Consumimos el evento
+        if (btn == cocos2d::CCMouseButton::ButtonMiddle) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
+            return true;
         }
 
-        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
-            if (down) pl->removeLastCheckpoint();
-            return; // Consumimos el evento
-        }
-
-        CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+        return CCMouseDispatcher::dispatchMouseMSG(btn, down);
     }
 };
 
