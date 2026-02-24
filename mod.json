@@ -1,20 +1,4 @@
-{
-    "geode": "5.0.0",
-    "gd": {
-        "win": "2.2081",
-        "android": "2.2074"
-    },
-    "id": "notadrix.mi_ctrl_jump",
-    "version": "v1.0.0",
-    "name": "Mi Ctrl Jump",
-    "developer": "notadrix",
-    "description": "Remapeo dinámico a Space, Click Derecho a Z, Ruedita a X.",
-    "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
-    "tags": [
-        "gameplay",
-        "utility"
-    ],
-    "settings": {
+"settings": {
         "jump1-key-id": {
             "type": "int",
             "default": 0,
@@ -27,10 +11,21 @@
             "name": "ID Salto 2",
             "hidden": true
         },
+        "jump1-button": {
+            "type": "custom",
+            "custom": "boton-vincular",
+            "name": "Vincular Salto 1",
+            "description": "Haz clic para elegir la tecla del Salto 1"
+        },
+        "jump2-button": {
+            "type": "custom",
+            "custom": "boton-vincular",
+            "name": "Vincular Salto 2",
+            "description": "Haz clic para elegir la tecla del Salto 2"
+        },
         "rapid-checkpoints": {
             "type": "bool",
             "default": true,
             "name": "Rapid Checkpoints (Mouse)"
         }
     }
-}
