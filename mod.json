@@ -5,30 +5,30 @@
         "android": "2.2074"
     },
     "id": "notadrix.mi_ctrl_jump",
-    "version": "v1.0.0",
+    "version": "v1.1.0",
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
-    "description": "Remapeo dinámico a Space, Click Derecho a Z, Ruedita a X.",
-    "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
+    "description": "Remapea teclas personalizadas a Space y botones del mouse a checkpoints de práctica.",
+    "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "tags": ["gameplay", "utility"],
     "settings": {
         "enable-jump-1": {
             "type": "bool",
             "default": false,
             "name": "Activar Salto 1",
-            "description": "Remapeo del Salto a la tecla personalizada"
+            "description": "Activa el remapeo de una tecla personalizada a Space. Al activar, presiona la tecla que quieras usar."
         },
         "enable-jump-2": {
             "type": "bool",
             "default": false,
             "name": "Activar Salto 2",
-            "description": "Salto Alternativo de J1"
+            "description": "Segunda tecla personalizada remapeada a Space. Compatible con Salto 1 simultáneamente."
         },
         "rapid-checkpoints": {
             "type": "bool",
             "default": true,
             "name": "Rapid Checkpoints (Mouse)",
-            "description": "Click derecho = z, Boton de la Rueda = x"
+            "description": "Click derecho = colocar checkpoint, Botón de rueda = eliminar último checkpoint. Solo funciona en modo práctica."
         }
     }
 }
