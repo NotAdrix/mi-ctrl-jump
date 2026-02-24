@@ -1,7 +1,9 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/loader/Event.hpp> // <-- LA PIEZA CLAVE PARA LINUX/MAC
+
+// Magia multiplataforma (Linux, Mac, Windows)
+#include <Geode/cocos/robtop/glfw/glfw3.h>
 
 using namespace geode::prelude;
 
@@ -24,9 +26,6 @@ namespace {
         geode::comm::ListenerHandle* j1SettingHandle = nullptr;
         geode::comm::ListenerHandle* j2SettingHandle = nullptr;
         geode::comm::ListenerHandle* rcSettingHandle = nullptr;
-
-        // Listener multiplataforma nativo de Geode (Linux, Mac, Windows)
-        geode::EventListener<geode::MouseInputEvent> mouseListener;
     } s;
 }
 
@@ -121,6 +120,44 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
+// ── Hook de Mouse (GLFW Multiplataforma) ──────────────────────────────────
+class $modify(PlayLayer) {
+    struct Fields {
+        bool rightDown = false;
+        bool middleDown = false;
+    };
+
+    void update(float dt) {
+        PlayLayer::update(dt);
+
+        if (!s.rapidCheckpoints || !m_isPracticeMode || m_isPaused) return;
+
+        auto* kbd = CCKeyboardDispatcher::get();
+        auto* view = cocos2d::CCEGLView::get();
+        if (!kbd || !view) return;
+
+        // Obtenemos la ventana base multiplataforma
+        auto* window = view->getWindow();
+        if (!window) return;
+
+        // Click Derecho -> Z
+        bool rightNow = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        if (rightNow && !m_fields->rightDown) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, true, false, 0.0);
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, false, false, 0.0);
+        }
+        m_fields->rightDown = rightNow;
+
+        // Click Rueda -> X
+        bool middleNow = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+        if (middleNow && !m_fields->middleDown) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, true, false, 0.0);
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, false, false, 0.0);
+        }
+        m_fields->middleDown = middleNow;
+    }
+};
+
 // ── Entry point ───────────────────────────────────────────────────────────
 $on_mod(Loaded) {
     auto* mod = Mod::get();
@@ -154,31 +191,5 @@ $on_mod(Loaded) {
     s.j2SettingHandle = setupJumpSetting("enable-jump-2", BindingSlot::Jump2, s.jump2Enabled);
     s.rcSettingHandle = listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
         s.rapidCheckpoints = enabled;
-    });
-
-    // ── Mouse Listener Nativo de Geode (100% Multiplataforma) ─────────────
-    s.mouseListener.bind([](geode::MouseInputData& data) {
-        if (!s.rapidCheckpoints) return geode::ListenerResult::Propagate;
-
-        auto* pl = PlayLayer::get();
-        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused)
-            return geode::ListenerResult::Propagate;
-
-        auto* kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return geode::ListenerResult::Propagate;
-
-        bool down = (data.action == geode::MouseInputData::Action::Press);
-
-        if (data.button == geode::MouseInputData::Button::Right) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return geode::ListenerResult::Stop;
-        }
-
-        if (data.button == geode::MouseInputData::Button::Middle) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return geode::ListenerResult::Stop;
-        }
-
-        return geode::ListenerResult::Propagate;
     });
 }
