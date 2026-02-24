@@ -9,13 +9,13 @@ bool g_isBindingJump1 = false;
 bool g_isBindingJump2 = false;
 
 $execute {
-    // --- 1. ESCUCHADORES (Se activan al poner el primer APPLY) ---
+    // --- 1. ESCUCHADORES (Usando Notificaciones sin botones) ---
     listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
         if (enabled) {
             g_isBindingJump1 = true;
-            FLAlertLayer::create("Modo Escucha", "Presiona la tecla que quieres usar para el Salto 1.\n\nPresiona [ESC] para cancelar.", "OK")->show();
+            // Cartel pequeño en la parte inferior, sin botones.
+            geode::Notification::create("BIND: Toca una tecla (ESC para cancelar)", geode::NotificationIcon::Info)->show();
         } else {
-            // Borrado silencioso de la memoria privada
             Mod::get()->setSavedValue("jump1-key-id", static_cast<int64_t>(0));
             geode::Notification::create("Salto 1 eliminado", geode::NotificationIcon::Error)->show();
         }
@@ -24,7 +24,7 @@ $execute {
     listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
         if (enabled) {
             g_isBindingJump2 = true;
-            FLAlertLayer::create("Modo Escucha", "Presiona la tecla que quieres usar para el Salto 2.\n\nPresiona [ESC] para cancelar.", "OK")->show();
+            geode::Notification::create("BIND: Toca una tecla (ESC para cancelar)", geode::NotificationIcon::Info)->show();
         } else {
             Mod::get()->setSavedValue("jump2-key-id", static_cast<int64_t>(0));
             geode::Notification::create("Salto 2 eliminado", geode::NotificationIcon::Error)->show();
@@ -48,23 +48,23 @@ $execute {
                     if (g_isBindingJump1) { g_isBindingJump1 = false; mod->setSettingValue("enable-jump-1", false); } 
                     else { g_isBindingJump2 = false; mod->setSettingValue("enable-jump-2", false); }
                     
-                    FLAlertLayer::create("Cancelado", "Vinculacion cancelada.\n\nPresiona APPLY para confirmar que desmarcaste la casilla.", "OK")->show();
+                    FLAlertLayer::create("Cancelado", \n\nPresiona APPLY para confirmar que desmarcaste la casilla.", "OK")->show();
                     return ListenerResult::Stop;
                 }
 
-                // Leemos la memoria privada (0 es el valor por defecto si no hay nada)
                 int64_t j1 = mod->getSavedValue<int64_t>("jump1-key-id", 0);
                 int64_t j2 = mod->getSavedValue<int64_t>("jump2-key-id", 0);
 
+                // Si todo sale bien, mostramos el cartel de Éxito gigante
                 if (g_isBindingJump1 && currentKey != j2) {
                     mod->setSavedValue("jump1-key-id", static_cast<int64_t>(currentKey));
                     g_isBindingJump1 = false;
-                    FLAlertLayer::create("Exito", "¡Tecla 1 vinculada con exito!\n\nYa puedes cerrar el menu sin presionar nada mas.", "OK")->show();
+                    FLAlertLayer::create("Exito", "¡Tecla 1 vinculada con exito!\n\n", "OK")->show();
                 } 
                 else if (g_isBindingJump2 && currentKey != j1) {
                     mod->setSavedValue("jump2-key-id", static_cast<int64_t>(currentKey));
                     g_isBindingJump2 = false;
-                    FLAlertLayer::create("Exito", "¡Tecla 2 vinculada con exito!\n\nYa puedes cerrar el menu sin presionar nada mas.", "OK")->show();
+                    FLAlertLayer::create("Exito", "¡Tecla 2 vinculada con exito!\n\n", "OK")->show();
                 }
             }
             return ListenerResult::Stop; 
