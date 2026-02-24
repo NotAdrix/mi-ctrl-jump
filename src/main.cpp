@@ -1,6 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/loader/Event.hpp>
+#include <Geode/modify/CCEGLView.hpp>
 
 using namespace geode::prelude;
 
@@ -19,14 +19,6 @@ namespace {
         bool rapidCheckpoints   = false;
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
-
-        // Arreglado: Geode devuelve punteros, no objetos opcionales
-        geode::comm::ListenerHandle* j1SettingHandle = nullptr;
-        geode::comm::ListenerHandle* j2SettingHandle = nullptr;
-        geode::comm::ListenerHandle* rcSettingHandle = nullptr;
-
-        // Volvemos a tu idea original: el event listener de Geode
-        geode::EventListener<geode::MouseInputEvent> mouseListener;
     } s;
 }
 
@@ -142,6 +134,44 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
+// ── Hook de mouse (reemplaza el EventListener eliminado) ──────────────────
+class $modify(CCEGLView) {
+    void onGLFWMouseCallBack(GLFWwindow* window, int button, int action, int mods) {
+        if (!s.rapidCheckpoints) {
+            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+            return;
+        }
+
+        auto* pl = PlayLayer::get();
+        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused) {
+            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+            return;
+        }
+
+        auto* kbd = CCKeyboardDispatcher::get();
+        if (!kbd) {
+            CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+            return;
+        }
+
+        bool down = (action == GLFW_PRESS);
+
+        // Botón derecho → tecla Z (colocar checkpoint)
+        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
+            return; // No propagar el clic original
+        }
+
+        // Botón medio → tecla X (borrar checkpoint)
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
+            return; // No propagar el clic original
+        }
+
+        CCEGLView::onGLFWMouseCallBack(window, button, action, mods);
+    }
+};
+
 // ── Entry point ───────────────────────────────────────────────────────────
 $on_mod(Loaded) {
     auto* mod = Mod::get();
@@ -156,51 +186,35 @@ $on_mod(Loaded) {
     s.jump2Key = raw2 ? static_cast<enumKeyCodes>(raw2) : enumKeyCodes::KEY_Unknown;
 
     // Registro de settings
-    auto setupJumpSetting = [](std::string setting, BindingSlot slot, bool& enabledState) {
-        return listenForSettingChanges<bool>(setting, [=, &enabledState](bool enabled) {
-            enabledState = enabled;
-            if (enabled) {
-                s.bindingSlot = slot;
-                geode::Notification::create(
-                    "Presiona una tecla para vincular (ESC cancela)",
-                    geode::NotificationIcon::Info
-                )->show();
-            } else {
-                cancelBinding();
-                clearKey(slot);
-            }
-        });
-    };
-
-    s.j1SettingHandle = setupJumpSetting("enable-jump-1", BindingSlot::Jump1, s.jump1Enabled);
-    s.j2SettingHandle = setupJumpSetting("enable-jump-2", BindingSlot::Jump2, s.jump2Enabled);
-    s.rcSettingHandle = listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
-        s.rapidCheckpoints = enabled;
+    listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
+        s.jump1Enabled = enabled;
+        if (enabled) {
+            s.bindingSlot = BindingSlot::Jump1;
+            geode::Notification::create(
+                "Presiona una tecla para vincular (ESC cancela)",
+                geode::NotificationIcon::Info
+            )->show();
+        } else {
+            cancelBinding();
+            clearKey(BindingSlot::Jump1);
+        }
     });
 
-    // ── Mouse Listener Nativo de Geode ────────────────────────────────────
-    s.mouseListener.bind([](geode::MouseInputData& data) {
-        if (!s.rapidCheckpoints) return geode::ListenerResult::Propagate;
-
-        auto* pl = PlayLayer::get();
-        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused)
-            return geode::ListenerResult::Propagate;
-
-        auto* kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return geode::ListenerResult::Propagate;
-
-        bool down = (data.action == geode::MouseInputData::Action::Press);
-
-        if (data.button == geode::MouseInputData::Button::Right) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return geode::ListenerResult::Stop;
+    listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
+        s.jump2Enabled = enabled;
+        if (enabled) {
+            s.bindingSlot = BindingSlot::Jump2;
+            geode::Notification::create(
+                "Presiona una tecla para vincular (ESC cancela)",
+                geode::NotificationIcon::Info
+            )->show();
+        } else {
+            cancelBinding();
+            clearKey(BindingSlot::Jump2);
         }
+    });
 
-        if (data.button == geode::MouseInputData::Button::Middle) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return geode::ListenerResult::Stop;
-        }
-
-        return geode::ListenerResult::Propagate;
+    listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
+        s.rapidCheckpoints = enabled;
     });
 }
