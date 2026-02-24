@@ -1,6 +1,5 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/CCMouseDispatcher.hpp>
 
 using namespace geode::prelude;
 
@@ -20,9 +19,13 @@ namespace {
         BindingSlot bindingSlot = BindingSlot::None;
         int jumpKeysHeld        = 0;
 
-        std::optional<geode::comm::ListenerHandle> j1SettingHandle;
-        std::optional<geode::comm::ListenerHandle> j2SettingHandle;
-        std::optional<geode::comm::ListenerHandle> rcSettingHandle;
+        // Arreglado: Geode devuelve punteros, no objetos opcionales
+        geode::comm::ListenerHandle* j1SettingHandle = nullptr;
+        geode::comm::ListenerHandle* j2SettingHandle = nullptr;
+        geode::comm::ListenerHandle* rcSettingHandle = nullptr;
+
+        // Volvemos a tu idea original: el event listener de Geode
+        EventListener<geode::MouseInputEvent> mouseListener;
     } s;
 }
 
@@ -138,34 +141,6 @@ class $modify(CCKeyboardDispatcher) {
     }
 };
 
-// ── Hook de mouse (Solución directa con Z y X) ────────────────────────────
-class $modify(CCMouseDispatcher) {
-    bool dispatchMouseMSG(cocos2d::CCMouseButton btn, bool down) {
-        if (!s.rapidCheckpoints)
-            return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-
-        auto* pl = PlayLayer::get();
-        // Solo inyectar teclas si estamos en modo práctica y sin pausa
-        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused)
-            return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-
-        auto* kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-
-        if (btn == cocos2d::CCMouseButton::ButtonRight) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
-            return true;
-        }
-
-        if (btn == cocos2d::CCMouseButton::ButtonMiddle) {
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
-            return true;
-        }
-
-        return CCMouseDispatcher::dispatchMouseMSG(btn, down);
-    }
-};
-
 // ── Entry point ───────────────────────────────────────────────────────────
 $on_mod(Loaded) {
     auto* mod = Mod::get();
@@ -179,6 +154,7 @@ $on_mod(Loaded) {
     s.jump1Key = raw1 ? static_cast<enumKeyCodes>(raw1) : enumKeyCodes::KEY_Unknown;
     s.jump2Key = raw2 ? static_cast<enumKeyCodes>(raw2) : enumKeyCodes::KEY_Unknown;
 
+    // Registro de settings
     auto setupJumpSetting = [](std::string setting, BindingSlot slot, bool& enabledState) {
         return listenForSettingChanges<bool>(setting, [=, &enabledState](bool enabled) {
             enabledState = enabled;
@@ -199,5 +175,31 @@ $on_mod(Loaded) {
     s.j2SettingHandle = setupJumpSetting("enable-jump-2", BindingSlot::Jump2, s.jump2Enabled);
     s.rcSettingHandle = listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
         s.rapidCheckpoints = enabled;
+    });
+
+    // ── Mouse Listener Nativo de Geode ────────────────────────────────────
+    s.mouseListener.bind([](geode::MouseInputData& data) {
+        if (!s.rapidCheckpoints) return geode::ListenerResult::Propagate;
+
+        auto* pl = PlayLayer::get();
+        if (!pl || !pl->m_isPracticeMode || pl->m_isPaused)
+            return geode::ListenerResult::Propagate;
+
+        auto* kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return geode::ListenerResult::Propagate;
+
+        bool down = (data.action == geode::MouseInputData::Action::Press);
+
+        if (data.button == geode::MouseInputData::Button::Right) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, 0.0);
+            return geode::ListenerResult::Stop;
+        }
+
+        if (data.button == geode::MouseInputData::Button::Middle) {
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, 0.0);
+            return geode::ListenerResult::Stop;
+        }
+
+        return geode::ListenerResult::Propagate;
     });
 }
