@@ -8,7 +8,7 @@
     "version": "v1.0.0",
     "name": "Mi Ctrl Jump",
     "developer": "notadrix",
-    "description": "Remapeo global configurable: Modificadores -> Space, Click Derecho -> Z, Ruedita -> X.",
+    "description": "Remapeo dinámico a Space, Click Derecho a Z, Ruedita a X.",
     "repository" : "https://github.com/NotAdrix/mi-ctrl-jump",
     "tags": [
         "gameplay",
@@ -26,6 +26,11 @@
             "default": 0,
             "name": "ID Salto 2",
             "hidden": true
+        },
+        "rapid-checkpoints": {
+            "type": "bool",
+            "default": true,
+            "name": "Rapid Checkpoints (Mouse)"
         }
     }
-} 
+}
