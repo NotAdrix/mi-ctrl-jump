@@ -15,17 +15,19 @@
         "utility"
     ],
     "settings": {
-        "jump1-key-id": {
-            "type": "int",
-            "default": 0,
-            "name": "ID Salto 1",
-            "hidden": true
+        "jump1-key-id": { "type": "int", "default": 0, "hidden": true },
+        "jump2-key-id": { "type": "int", "default": 0, "hidden": true },
+        "binding-mode-1": {
+            "type": "bool",
+            "default": false,
+            "name": "Vincular Salto 1",
+            "description": "1. Activa la casilla.\n2. Toca la tecla que quieres usar.\n(Toca ESC para cancelar)"
         },
-        "jump2-key-id": {
-            "type": "int",
-            "default": 0,
-            "name": "ID Salto 2",
-            "hidden": true
+        "binding-mode-2": {
+            "type": "bool",
+            "default": false,
+            "name": "Vincular Salto 2",
+            "description": "1. Activa la casilla.\n2. Toca la tecla que quieres usar.\n(Toca ESC para cancelar)"
         },
         "rapid-checkpoints": {
             "type": "bool",
