@@ -48,7 +48,7 @@ $execute {
                     if (g_isBindingJump1) { g_isBindingJump1 = false; mod->setSettingValue("enable-jump-1", false); } 
                     else { g_isBindingJump2 = false; mod->setSettingValue("enable-jump-2", false); }
                     
-                    FLAlertLayer::create("Cancelado", \n\nPresiona APPLY para confirmar que desmarcaste la casilla.", "OK")->show();
+                    FLAlertLayer::create("Cancelado", "Vinculacion cancelada.\n\nPresiona APPLY para confirmar que desmarcaste la casilla.", "OK")->show();
                     return ListenerResult::Stop;
                 }
 
