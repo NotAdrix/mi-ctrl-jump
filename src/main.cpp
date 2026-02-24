@@ -2,13 +2,8 @@
 #include <Geode/utils/Keyboard.hpp>
 #include <Geode/loader/Event.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/loader/SettingNode.hpp>
 
 using namespace geode::prelude;
-
-// Variables globales para controlar el estado de vinculación
-bool g_isBindingJump1 = false;
-bool g_isBindingJump2 = false;
 
 $execute {
     // ── TECLADO DINÁMICO ────────────────────────────────────────────────────
@@ -19,27 +14,39 @@ $execute {
 
         int currentKey = static_cast<int>(data.key);
         
-        // --- Lógica de Vinculación (Modo Escucha) ---
-        if (g_isBindingJump1 || g_isBindingJump2) {
+        // --- Lógica de Vinculación (Leyendo las casillas del menú) ---
+        bool isBinding1 = mod->getSettingValue<bool>("binding-mode-1");
+        bool isBinding2 = mod->getSettingValue<bool>("binding-mode-2");
+
+        if (isBinding1 || isBinding2) {
             if (data.action == geode::KeyboardInputData::Action::Press) {
+                
+                // Si el usuario toca la tecla Escape, cancelamos la vinculación
+                if (currentKey == static_cast<int>(enumKeyCodes::KEY_Escape)) {
+                    mod->setSettingValue("binding-mode-1", false);
+                    mod->setSettingValue("binding-mode-2", false);
+                    FLAlertLayer::create("Cancelado", "Vinculación cancelada.", "OK")->show();
+                    return ListenerResult::Propagate;
+                }
+
                 int64_t j1 = mod->getSettingValue<int64_t>("jump1-key-id");
                 int64_t j2 = mod->getSettingValue<int64_t>("jump2-key-id");
 
-                if (g_isBindingJump1 && currentKey != j2) {
+                if (isBinding1 && currentKey != j2) {
                     mod->setSettingValue("jump1-key-id", static_cast<int64_t>(currentKey));
-                    g_isBindingJump1 = false;
-                    FLAlertLayer::create("Éxito", "Tecla 1 vinculada", "OK")->show();
+                    mod->setSettingValue("binding-mode-1", false); // Apaga la casilla sola
+                    FLAlertLayer::create("Éxito", "Tecla 1 vinculada con éxito.", "OK")->show();
                 } 
-                else if (g_isBindingJump2 && currentKey != j1) {
+                else if (isBinding2 && currentKey != j1) {
                     mod->setSettingValue("jump2-key-id", static_cast<int64_t>(currentKey));
-                    g_isBindingJump2 = false;
-                    FLAlertLayer::create("Éxito", "Tecla 2 vinculada", "OK")->show();
+                    mod->setSettingValue("binding-mode-2", false); // Apaga la casilla sola
+                    FLAlertLayer::create("Éxito", "Tecla 2 vinculada con éxito.", "OK")->show();
                 }
             }
-            return ListenerResult::Stop; 
+            return ListenerResult::Stop; // Detenemos la tecla para que el juego no la lea
         }
 
-        // --- Re-mapeo Dinámico al Espacio ---
+        // --- Re-mapeo Dinámico al Espacio (Modo Juego) ---
         int64_t jump1Key = mod->getSettingValue<int64_t>("jump1-key-id");
         int64_t jump2Key = mod->getSettingValue<int64_t>("jump2-key-id");
 
@@ -62,12 +69,10 @@ $execute {
         if (Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
             bool down = (data.action == geode::MouseInputData::Action::Press);
             
-            // Clic Derecho -> Z
             if (data.button == geode::MouseInputData::Button::Right) {
                 kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, data.timestamp);
                 return ListenerResult::Stop;
             }
-            // Clic de la Rueda (Middle Click) -> X
             if (data.button == geode::MouseInputData::Button::Middle) {
                 kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, data.timestamp);
                 return ListenerResult::Stop;
