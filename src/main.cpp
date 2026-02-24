@@ -1,6 +1,8 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/utils/Keyboard.hpp>
+#include <Geode/loader/Event.hpp>
 
 using namespace geode::prelude;
 
