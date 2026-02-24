@@ -9,34 +9,6 @@ bool g_isBindingJump1 = false;
 bool g_isBindingJump2 = false;
 
 $execute {
-    static bool modIsActive = false;
-
-    // Función para verificar si un modificador físico debe estar activado según Settings
-    auto getEnabledMask = []() {
-        int mask = 0;
-        auto mod = Mod::get();
-        // Si L-Ctrl o R-Ctrl están activados en settings, vigilamos el bit de Control (2)
-        if (mod->getSettingValue<bool>("l-ctrl") || mod->getSettingValue<bool>("r-ctrl")) mask |= 2;
-        // Si L-Shift o R-Shift están activados, vigilamos el bit de Shift (1)
-        if (mod->getSettingValue<bool>("l-shift") || mod->getSettingValue<bool>("r-shift")) mask |= 1;
-        // Si L-Alt o R-Alt están activados, vigilamos el bit de Alt (4)
-        if (mod->getSettingValue<bool>("l-alt") || mod->getSettingValue<bool>("r-alt")) mask |= 4;
-        return mask;
-    };
-
-    auto forceSync = [getEnabledMask](geode::KeyboardModifier mods, double timestamp) {
-        auto kbd = CCKeyboardDispatcher::get();
-        if (!kbd) return;
-
-        int activeMask = getEnabledMask();
-        bool anyTargetModifierDown = (static_cast<int>(mods) & activeMask);
-
-        if (modIsActive && !anyTargetModifierDown) {
-            modIsActive = false;
-            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, false, false, timestamp);
-        }
-    };
-
     // ── TECLADO DINÁMICO ────────────────────────────────────────────────────
     geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
@@ -85,7 +57,7 @@ $execute {
         return ListenerResult::Propagate;
     }).leak();
 
-    // ── MOUSE Y SCROLL (Rapid Checkpoints) ──────────────────────────────────
+    // ── MOUSE Y boton de la rueda (Rapid Checkpoints) ──────────────────────────────────
     geode::MouseInputEvent().listen([forceSync](geode::MouseInputData& data) {
         auto kbd = CCKeyboardDispatcher::get();
         if (!kbd) return ListenerResult::Propagate;
