@@ -1,64 +1,104 @@
 #include <Geode/Geode.hpp>
-#include <Geode/binding/PlayLayer.hpp>
+#include <Geode/utils/Keyboard.hpp>
+#include <Geode/loader/Event.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 
 using namespace geode::prelude;
 
-static constexpr enumKeyCodes JUMP_KEY = enumKeyCodes::KEY_Control;
-
-struct $modify(CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double timestamp) {
-        auto pl = PlayLayer::get();
-
-        if (pl && !isRepeat && key == JUMP_KEY) {
-            pl->queueButton(1, down, false, timestamp);
-            return true;
-        }
-
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
-    }
-};
+bool g_isBindingJump1 = false;
+bool g_isBindingJump2 = false;
 
 $execute {
-    geode::MouseInputEvent().listen([](geode::MouseInputData& data) -> bool {
-        auto pl = PlayLayer::get();
-        if (!pl) return false;
-
-        if (!Mod::get()->getSettingValue<bool>("rapid-checkpoints")) return false;
-
-        bool down = (data.action == geode::MouseInputData::Action::Press);
-        auto kbd  = CCKeyboardDispatcher::get();
-        if (!kbd) return false;
-
-        auto shift = kbd->m_bShiftPressed;
-        auto ctrl  = kbd->m_bControlPressed;
-        auto alt   = kbd->m_bAltPressed;
-        auto cmd   = kbd->m_bCommandPressed;
-        kbd->m_bShiftPressed   = false;
-        kbd->m_bControlPressed = false;
-        kbd->m_bAltPressed     = false;
-        kbd->m_bCommandPressed = false;
-
-        bool handled = false;
-
-        if (data.button == geode::MouseInputData::Button::Right) {
-            kbd->dispatchKeyboardMSG(KEY_Z, down, false, data.timestamp);
-            handled = true;
+    listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
+        if (enabled) {
+            g_isBindingJump1 = true;
+            geode::Notification::create("BIND: Toca una tecla (ESC para cancelar)", geode::NotificationIcon::Info)->show();
+        } else {
+            Mod::get()->setSavedValue("jump1-key-id", static_cast<int64_t>(0));
+            geode::Notification::create("Salto 1 eliminado", geode::NotificationIcon::Error)->show();
         }
-        else if (data.button == geode::MouseInputData::Button::Middle) {
-            kbd->dispatchKeyboardMSG(KEY_X, down, false, data.timestamp);
-            handled = true;
+    });
+
+    listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
+        if (enabled) {
+            g_isBindingJump2 = true;
+            geode::Notification::create("BIND: Toca una tecla (ESC para cancelar)", geode::NotificationIcon::Info)->show();
+        } else {
+            Mod::get()->setSavedValue("jump2-key-id", static_cast<int64_t>(0));
+            geode::Notification::create("Salto 2 eliminado", geode::NotificationIcon::Error)->show();
         }
-        else if (data.button == geode::MouseInputData::Button::Button4) {
-            kbd->dispatchKeyboardMSG(KEY_R, down, false, data.timestamp);
-            handled = true;
+    });
+
+    geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
+        auto kbd = CCKeyboardDispatcher::get();
+        auto mod = Mod::get();
+        if (!kbd) return ListenerResult::Propagate;
+
+        int currentKey = static_cast<int>(data.key);
+        
+        if (g_isBindingJump1 || g_isBindingJump2) {
+            if (data.action == geode::KeyboardInputData::Action::Press) {
+                if (currentKey == static_cast<int>(enumKeyCodes::KEY_Escape)) {
+                    if (g_isBindingJump1) { g_isBindingJump1 = false; mod->setSettingValue("enable-jump-1", false); } 
+                    else { g_isBindingJump2 = false; mod->setSettingValue("enable-jump-2", false); }
+                    FLAlertLayer::create("Cancelado", "Vinculacion cancelada.\n\nPresiona APPLY para confirmar que desmarcaste la casilla.", "OK")->show();
+                    return ListenerResult::Stop;
+                }
+
+                int64_t j1 = mod->getSavedValue<int64_t>("jump1-key-id", 0);
+                int64_t j2 = mod->getSavedValue<int64_t>("jump2-key-id", 0);
+
+                if (g_isBindingJump1 && currentKey != j2) {
+                    mod->setSavedValue("jump1-key-id", static_cast<int64_t>(currentKey));
+                    g_isBindingJump1 = false;
+                    FLAlertLayer::create("Exito", "¡Tecla 1 vinculada con exito!", "OK")->show();
+                } 
+                else if (g_isBindingJump2 && currentKey != j1) {
+                    mod->setSavedValue("jump2-key-id", static_cast<int64_t>(currentKey));
+                    g_isBindingJump2 = false;
+                    FLAlertLayer::create("Exito", "¡Tecla 2 vinculada con exito!", "OK")->show();
+                }
+            }
+            return ListenerResult::Stop; 
         }
 
-        kbd->m_bShiftPressed   = shift;
-        kbd->m_bControlPressed = ctrl;
-        kbd->m_bAltPressed     = alt;
-        kbd->m_bCommandPressed = cmd;
+        bool isEnabled1 = mod->getSettingValue<bool>("enable-jump-1");
+        bool isEnabled2 = mod->getSettingValue<bool>("enable-jump-2");
+        int64_t jump1Key = mod->getSavedValue<int64_t>("jump1-key-id", 0);
+        int64_t jump2Key = mod->getSavedValue<int64_t>("jump2-key-id", 0);
 
-        return handled;
+        bool isJump1Pressed = (isEnabled1 && jump1Key != 0 && currentKey == jump1Key);
+        bool isJump2Pressed = (isEnabled2 && jump2Key != 0 && currentKey == jump2Key);
+
+        if (isJump1Pressed || isJump2Pressed) {
+            bool down = (data.action != geode::KeyboardInputData::Action::Release);
+            bool isRepeat = (data.action == geode::KeyboardInputData::Action::Repeat);
+            kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Space, down, isRepeat, data.timestamp);
+            return ListenerResult::Stop; 
+        }
+
+        return ListenerResult::Propagate;
+    }).leak();
+
+    geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
+        auto kbd = CCKeyboardDispatcher::get();
+        if (!kbd) return ListenerResult::Propagate;
+
+        if (Mod::get()->getSettingValue<bool>("rapid-checkpoints")) {
+            bool down = (data.action == geode::MouseInputData::Action::Press);
+            if (data.button == geode::MouseInputData::Button::Right) {
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_Z, down, false, data.timestamp);
+                return ListenerResult::Stop;
+            }
+            if (data.button == geode::MouseInputData::Button::Middle) {
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_X, down, false, data.timestamp);
+                return ListenerResult::Stop;
+            }
+            if (data.button == geode::MouseInputData::Button::Button4) {
+                kbd->dispatchKeyboardMSG(enumKeyCodes::KEY_R, down, false, data.timestamp);
+                return ListenerResult::Stop;
+            }
+        }
+        return ListenerResult::Propagate;
     }).leak();
 }
