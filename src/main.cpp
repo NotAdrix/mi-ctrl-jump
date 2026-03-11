@@ -1,30 +1,30 @@
 #include <Geode/Geode.hpp>
 #include <Geode/binding/PlayLayer.hpp>
+#include <Geode/modify/CCKeyboardDispatcher.hpp>
 
 using namespace geode::prelude;
 
 static constexpr enumKeyCodes JUMP_KEY = enumKeyCodes::KEY_Control;
 
-$execute {
-    geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
+struct $modify(CCKeyboardDispatcher) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double timestamp) {
         auto pl = PlayLayer::get();
-        if (!pl) return ListenerResult::Propagate;
 
-        bool down   = (data.action != geode::KeyboardInputData::Action::Release);
-        bool repeat = (data.action == geode::KeyboardInputData::Action::Repeat);
-        if (repeat) return ListenerResult::Propagate;
-
-        if (data.key == JUMP_KEY) {
-            pl->queueButton(1, down, false, data.timestamp);
-            return ListenerResult::Stop;
+        if (pl && !isRepeat && key == JUMP_KEY) {
+            pl->queueButton(1, down, false, timestamp);
+            return true;
         }
 
-        return ListenerResult::Propagate;
-    }).leak();
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
+    }
+};
 
+$execute {
     geode::MouseInputEvent().listen([](geode::MouseInputData& data) -> bool {
         auto pl = PlayLayer::get();
         if (!pl) return false;
+
+        if (!Mod::get()->getSettingValue<bool>("rapid-checkpoints")) return false;
 
         bool down = (data.action == geode::MouseInputData::Action::Press);
         auto kbd  = CCKeyboardDispatcher::get();
