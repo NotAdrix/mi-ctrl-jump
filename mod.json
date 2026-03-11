@@ -12,6 +12,18 @@
     "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "tags": ["gameplay", "utility"],
     "settings": {
+        "enable-jump-1": {
+            "type": "bool",
+            "default": false,
+            "name": "Activar Salto 1",
+            "description": "Activa el remapeo de una tecla personalizada."
+        },
+        "enable-jump-2": {
+            "type": "bool",
+            "default": false,
+            "name": "Activar Salto 2",
+            "description": "Segunda tecla personalizada."
+        },
         "rapid-checkpoints": {
             "type": "bool",
             "default": true,
