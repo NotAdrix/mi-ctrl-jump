@@ -12,23 +12,10 @@
     "repository": "https://github.com/NotAdrix/mi-ctrl-jump",
     "tags": ["gameplay", "utility"],
     "settings": {
-        "enable-jump-1": {
-            "type": "bool",
-            "default": false,
-            "name": "Activar Salto 1",
-            "description": "Activa el remapeo de una tecla personalizada a Space. Al activar, presiona la tecla que quieras usar."
-        },
-        "enable-jump-2": {
-            "type": "bool",
-            "default": false,
-            "name": "Activar Salto 2",
-            "description": "Segunda tecla personalizada remapeada a Space. Compatible con Salto 1 simultáneamente."
-        },
         "rapid-checkpoints": {
             "type": "bool",
             "default": true,
             "name": "Rapid Checkpoints (Mouse)",
-            "description": "Click derecho = colocar checkpoint, Botón de rueda = eliminar último checkpoint. Solo funciona en modo práctica."
+            "description": "Click derecho = checkpoint, Rueda = borrar checkpoint, Botón4 = reiniciar."
         }
-    }
 }
