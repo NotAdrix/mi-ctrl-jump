@@ -3,11 +3,7 @@
 
 using namespace geode::prelude;
 
-// ── Teclas hardcodeadas ────────────────────────────────────────────────────
-static constexpr int JUMP_KEY        = enumKeyCodes::KEY_Control; // tu tecla
-static constexpr int CHECKPOINT_KEY  = enumKeyCodes::KEY_MB4;     // o lo que uses
-static constexpr int DEL_CHECK_KEY   = enumKeyCodes::KEY_MB5;
-static constexpr int RESET_KEY       = enumKeyCodes::KEY_MB4;     // boton4 mouse = R
+static constexpr enumKeyCodes JUMP_KEY = enumKeyCodes::KEY_Control;
 
 $execute {
     geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
@@ -18,10 +14,7 @@ $execute {
         bool repeat = (data.action == geode::KeyboardInputData::Action::Repeat);
         if (repeat) return ListenerResult::Propagate;
 
-        int key = static_cast<int>(data.key);
-
-        // Salto — directo a queueButton, sin rodeo por dispatcher
-        if (key == JUMP_KEY) {
+        if (data.key == JUMP_KEY) {
             pl->queueButton(1, down, false, data.timestamp);
             return ListenerResult::Stop;
         }
@@ -29,15 +22,14 @@ $execute {
         return ListenerResult::Propagate;
     }).leak();
 
-    geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
+    geode::MouseInputEvent().listen([](geode::MouseInputData& data) -> bool {
         auto pl = PlayLayer::get();
-        if (!pl) return ListenerResult::Propagate;
+        if (!pl) return false;
 
         bool down = (data.action == geode::MouseInputData::Action::Press);
         auto kbd  = CCKeyboardDispatcher::get();
-        if (!kbd) return ListenerResult::Propagate;
+        if (!kbd) return false;
 
-        // Limpia modificadores antes de despachar, resuelve el bug de Ctrl/Alt
         auto shift = kbd->m_bShiftPressed;
         auto ctrl  = kbd->m_bControlPressed;
         auto alt   = kbd->m_bAltPressed;
@@ -47,27 +39,26 @@ $execute {
         kbd->m_bAltPressed     = false;
         kbd->m_bCommandPressed = false;
 
-        ListenerResult result = ListenerResult::Propagate;
+        bool handled = false;
 
         if (data.button == geode::MouseInputData::Button::Right) {
             kbd->dispatchKeyboardMSG(KEY_Z, down, false, data.timestamp);
-            result = ListenerResult::Stop;
+            handled = true;
         }
         else if (data.button == geode::MouseInputData::Button::Middle) {
             kbd->dispatchKeyboardMSG(KEY_X, down, false, data.timestamp);
-            result = ListenerResult::Stop;
+            handled = true;
         }
         else if (data.button == geode::MouseInputData::Button::Button4) {
             kbd->dispatchKeyboardMSG(KEY_R, down, false, data.timestamp);
-            result = ListenerResult::Stop;
+            handled = true;
         }
 
-        // Restaura modificadores
         kbd->m_bShiftPressed   = shift;
         kbd->m_bControlPressed = ctrl;
         kbd->m_bAltPressed     = alt;
         kbd->m_bCommandPressed = cmd;
 
-        return result;
+        return handled;
     }).leak();
 }
