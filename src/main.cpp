@@ -1,193 +1,73 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/CCKeyboardDispatcher.hpp>
-#include <Geode/modify/PlayLayer.hpp>
-#include <Geode/utils/Keyboard.hpp>
-#include <Geode/loader/Event.hpp>
+#include <Geode/binding/PlayLayer.hpp>
 
 using namespace geode::prelude;
 
-// --- Configuración y Constantes ---
-static constexpr enumKeyCodes JUMP_KEY = enumKeyCodes::KEY_Space;
-static constexpr enumKeyCodes CHECKPOINT_SAVE = enumKeyCodes::KEY_Z;
-static constexpr enumKeyCodes CHECKPOINT_LOAD = enumKeyCodes::KEY_X;
-static constexpr const char* SAVE_KEY_J1 = "jump1-key-id";
-static constexpr const char* SAVE_KEY_J2 = "jump2-key-id";
+// ── Teclas hardcodeadas ────────────────────────────────────────────────────
+static constexpr int JUMP_KEY        = enumKeyCodes::KEY_Control; // tu tecla
+static constexpr int CHECKPOINT_KEY  = enumKeyCodes::KEY_MB4;     // o lo que uses
+static constexpr int DEL_CHECK_KEY   = enumKeyCodes::KEY_MB5;
+static constexpr int RESET_KEY       = enumKeyCodes::KEY_MB4;     // boton4 mouse = R
 
-enum class BindingSlot { None, Jump1, Jump2 };
+$execute {
+    geode::KeyboardInputEvent().listen([](geode::KeyboardInputData& data) {
+        auto pl = PlayLayer::get();
+        if (!pl) return ListenerResult::Propagate;
 
-struct RemapState {
-    enumKeyCodes jump1Key = enumKeyCodes::KEY_Unknown;
-    enumKeyCodes jump2Key = enumKeyCodes::KEY_Unknown;
-    bool jump1Enabled = false;
-    bool jump2Enabled = false;
-    bool rapidCheckpoints = false;
-    BindingSlot bindingSlot = BindingSlot::None;
-    int jumpKeysHeld = 0;
-} s;
+        bool down   = (data.action != geode::KeyboardInputData::Action::Release);
+        bool repeat = (data.action == geode::KeyboardInputData::Action::Repeat);
+        if (repeat) return ListenerResult::Propagate;
 
-// --- Funciones de Utilidad ---
-static void cancelBinding() {
-    if (s.bindingSlot == BindingSlot::None) return;
-    s.bindingSlot = BindingSlot::None;
-    geode::Notification::create("Vinculación cancelada", geode::NotificationIcon::Warning)->show();
-}
+        int key = static_cast<int>(data.key);
 
-static void clearKey(BindingSlot slot) {
-    auto* mod = Mod::get();
-    if (slot == BindingSlot::Jump1) {
-        s.jump1Key = enumKeyCodes::KEY_Unknown;
-        mod->setSavedValue(SAVE_KEY_J1, static_cast<int64_t>(0));
-        geode::Notification::create("Salto 1 eliminado", geode::NotificationIcon::Error)->show();
-    } else {
-        s.jump2Key = enumKeyCodes::KEY_Unknown;
-        mod->setSavedValue(SAVE_KEY_J2, static_cast<int64_t>(0));
-        geode::Notification::create("Salto 2 eliminado", geode::NotificationIcon::Error)->show();
-    }
-}
-
-static bool tryBindKey(enumKeyCodes key) {
-    // [FIX] Bloquear el bindeo de la tecla de salto original
-    if (key == JUMP_KEY) {
-        FLAlertLayer::create("Conflicto", "No puedes usar la tecla de salto original.", "OK")->show();
-        return false;
-    }
-
-    enumKeyCodes otherKey = (s.bindingSlot == BindingSlot::Jump1) ? s.jump2Key : s.jump1Key;
-    if (key == otherKey && key != enumKeyCodes::KEY_Unknown) {
-        FLAlertLayer::create("Conflicto", "Esa tecla ya está usada.", "OK")->show();
-        return false;
-    }
-
-    auto* mod = Mod::get();
-    if (s.bindingSlot == BindingSlot::Jump1) {
-        s.jump1Key = key;
-        mod->setSavedValue(SAVE_KEY_J1, static_cast<int64_t>(key));
-    } else {
-        s.jump2Key = key;
-        mod->setSavedValue(SAVE_KEY_J2, static_cast<int64_t>(key));
-    }
-
-    s.bindingSlot = BindingSlot::None;
-    FLAlertLayer::create("Éxito", "¡Tecla vinculada!\nDesactiva y activa la casilla para cambiarla.", "OK")->show();
-    return true;
-}
-
-// --- Hook de Teclado ---
-class $modify(CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double timestamp) {
-        
-        // 1. Lógica de Vinculación (Settings)
-        if (s.bindingSlot != BindingSlot::None) {
-            if (down && !isRepeat) {
-                if (key == enumKeyCodes::KEY_Escape) cancelBinding();
-                else tryBindKey(key);
-            }
-            return true;
+        // Salto — directo a queueButton, sin rodeo por dispatcher
+        if (key == JUMP_KEY) {
+            pl->queueButton(1, down, false, data.timestamp);
+            return ListenerResult::Stop;
         }
 
-        // 2. Verificación de Juego
-        auto* pl = PlayLayer::get();
-        if (!pl || pl->m_isPaused) {
-            s.jumpKeysHeld = 0;
-            return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
-        }
-
-        // 3. Re-mapeo de Saltos
-        bool isJ1 = s.jump1Enabled && s.jump1Key != enumKeyCodes::KEY_Unknown && key == s.jump1Key;
-        bool isJ2 = s.jump2Enabled && s.jump2Key != enumKeyCodes::KEY_Unknown && key == s.jump2Key;
-
-        if ((isJ1 || isJ2) && key != JUMP_KEY) {
-            if (down) {
-                if (!isRepeat) {
-                    if (s.jumpKeysHeld == 0)
-                        CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, true, false, timestamp);
-                    s.jumpKeysHeld++;
-                } else {
-                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, true, true, timestamp);
-                }
-            } else {
-                if (s.jumpKeysHeld > 0) s.jumpKeysHeld--;
-                if (s.jumpKeysHeld == 0)
-                    CCKeyboardDispatcher::dispatchKeyboardMSG(JUMP_KEY, false, false, timestamp);
-            }
-            return true;
-        }
-
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
-    }
-};
-
-// --- [FIX] Reset de jumpKeysHeld al morir o salir ---
-class $modify(PlayLayer) {
-    void resetLevel() {
-        s.jumpKeysHeld = 0;
-        PlayLayer::resetLevel();
-    }
-    void onQuit() {
-        s.jumpKeysHeld = 0;
-        PlayLayer::onQuit();
-    }
-};
-
-// --- Manejo de Mouse ---
-void handleMouseInput(geode::MouseInputData& data) {
-    if (!s.rapidCheckpoints) return;
-    
-    auto* pl = PlayLayer::get();
-    if (!pl || !pl->m_isPracticeMode || pl->m_isPaused) return;
-
-    auto* kbd = CCKeyboardDispatcher::get();
-    if (!kbd) return;
-
-    bool down = (data.action == geode::MouseInputData::Action::Press);
-
-    if (data.button == geode::MouseInputData::Button::Right) {
-        kbd->dispatchKeyboardMSG(CHECKPOINT_SAVE, down, false, data.timestamp);
-    }
-    else if (data.button == geode::MouseInputData::Button::Middle) {
-        kbd->dispatchKeyboardMSG(CHECKPOINT_LOAD, down, false, data.timestamp);
-    }
-}
-
-// --- Entrada del Mod ---
-$on_mod(Loaded) {
-    auto* mod = Mod::get();
-
-    s.jump1Enabled = mod->getSettingValue<bool>("enable-jump-1");
-    s.jump2Enabled = mod->getSettingValue<bool>("enable-jump-2");
-    s.rapidCheckpoints = mod->getSettingValue<bool>("rapid-checkpoints");
-
-    auto raw1 = mod->getSavedValue<int64_t>(SAVE_KEY_J1, 0);
-    auto raw2 = mod->getSavedValue<int64_t>(SAVE_KEY_J2, 0);
-    s.jump1Key = raw1 ? static_cast<enumKeyCodes>(raw1) : enumKeyCodes::KEY_Unknown;
-    s.jump2Key = raw2 ? static_cast<enumKeyCodes>(raw2) : enumKeyCodes::KEY_Unknown;
-
-    listenForSettingChanges<bool>("enable-jump-1", [](bool enabled) {
-        s.jump1Enabled = enabled;
-        if (enabled) {
-            s.bindingSlot = BindingSlot::Jump1;
-            geode::Notification::create("Presiona una tecla para Salto 1", geode::NotificationIcon::Info)->show();
-        } else {
-            clearKey(BindingSlot::Jump1);
-        }
-    });
-
-    listenForSettingChanges<bool>("enable-jump-2", [](bool enabled) {
-        s.jump2Enabled = enabled;
-        if (enabled) {
-            s.bindingSlot = BindingSlot::Jump2;
-            geode::Notification::create("Presiona una tecla para Salto 2", geode::NotificationIcon::Info)->show();
-        } else {
-            clearKey(BindingSlot::Jump2);
-        }
-    });
-
-    listenForSettingChanges<bool>("rapid-checkpoints", [](bool enabled) {
-        s.rapidCheckpoints = enabled;
-    });
+        return ListenerResult::Propagate;
+    }).leak();
 
     geode::MouseInputEvent().listen([](geode::MouseInputData& data) {
-        handleMouseInput(data);
-        return ListenerResult::Propagate;
+        auto pl = PlayLayer::get();
+        if (!pl) return ListenerResult::Propagate;
+
+        bool down = (data.action == geode::MouseInputData::Action::Press);
+        auto kbd  = CCKeyboardDispatcher::get();
+        if (!kbd) return ListenerResult::Propagate;
+
+        // Limpia modificadores antes de despachar, resuelve el bug de Ctrl/Alt
+        auto shift = kbd->m_bShiftPressed;
+        auto ctrl  = kbd->m_bControlPressed;
+        auto alt   = kbd->m_bAltPressed;
+        auto cmd   = kbd->m_bCommandPressed;
+        kbd->m_bShiftPressed   = false;
+        kbd->m_bControlPressed = false;
+        kbd->m_bAltPressed     = false;
+        kbd->m_bCommandPressed = false;
+
+        ListenerResult result = ListenerResult::Propagate;
+
+        if (data.button == geode::MouseInputData::Button::Right) {
+            kbd->dispatchKeyboardMSG(KEY_Z, down, false, data.timestamp);
+            result = ListenerResult::Stop;
+        }
+        else if (data.button == geode::MouseInputData::Button::Middle) {
+            kbd->dispatchKeyboardMSG(KEY_X, down, false, data.timestamp);
+            result = ListenerResult::Stop;
+        }
+        else if (data.button == geode::MouseInputData::Button::Button4) {
+            kbd->dispatchKeyboardMSG(KEY_R, down, false, data.timestamp);
+            result = ListenerResult::Stop;
+        }
+
+        // Restaura modificadores
+        kbd->m_bShiftPressed   = shift;
+        kbd->m_bControlPressed = ctrl;
+        kbd->m_bAltPressed     = alt;
+        kbd->m_bCommandPressed = cmd;
+
+        return result;
     }).leak();
 }
